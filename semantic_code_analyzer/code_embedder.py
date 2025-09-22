@@ -107,18 +107,24 @@ class CodeEmbedder:
         logger.info(f"Loading model: {self.config.model_name}")
 
         try:
-            # Load tokenizer
-            self.tokenizer = AutoTokenizer.from_pretrained(
-                self.config.model_name,
-                trust_remote_code=True
-            )
+            # Suppress model loading warnings
+            import warnings
+            with warnings.catch_warnings():
+                warnings.filterwarnings("ignore", message="Some weights of.*were not initialized")
+                warnings.filterwarnings("ignore", message="You should probably TRAIN this model")
 
-            # Load model with optimizations
-            self.model = AutoModel.from_pretrained(
-                self.config.model_name,
-                trust_remote_code=True,
-                torch_dtype=torch.float16 if self.device.type == "mps" else torch.float32
-            )
+                # Load tokenizer
+                self.tokenizer = AutoTokenizer.from_pretrained(
+                    self.config.model_name,
+                    trust_remote_code=True
+                )
+
+                # Load model with optimizations
+                self.model = AutoModel.from_pretrained(
+                    self.config.model_name,
+                    trust_remote_code=True,
+                    dtype=torch.float16 if self.device.type == "mps" else torch.float32
+                )
 
             # Move model to device
             self.model.to(self.device)

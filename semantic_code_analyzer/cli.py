@@ -40,12 +40,20 @@ logger = logging.getLogger(__name__)
 
 def setup_logging(verbose: bool, quiet: bool):
     """Setup logging configuration based on verbosity flags."""
+    import warnings
+
     if quiet:
         logging.getLogger().setLevel(logging.ERROR)
+        # Suppress all warnings in quiet mode
+        warnings.filterwarnings("ignore")
     elif verbose:
         logging.getLogger().setLevel(logging.DEBUG)
     else:
-        logging.getLogger().setLevel(logging.INFO)
+        logging.getLogger().setLevel(logging.WARNING)  # Clean default - only warnings and errors
+        # Suppress common PyTorch warnings that users can't act on
+        warnings.filterwarnings("ignore", message=".*record_context_cpp.*")
+        warnings.filterwarnings("ignore", message=".*torch._dynamo.*")
+        warnings.filterwarnings("ignore", category=UserWarning, module="torch.*")
 
 
 @click.group()
@@ -120,12 +128,12 @@ def analyze(ctx, commit_hash: str, repo_path: str, language: str, model: str,
             console=console
         ) as progress:
 
-            init_task = progress.add_task("Initializing semantic scorer...", total=None)
+            init_task = progress.add_task(f"Loading {model} model and initializing...", total=None)
             scorer = SemanticScorer(repo_path, config)
             progress.update(init_task, completed=True)
 
             # Perform analysis
-            analysis_task = progress.add_task("Analyzing commit similarity...", total=None)
+            analysis_task = progress.add_task(f"Analyzing commit {commit_hash[:8]} similarity...", total=None)
             result = scorer.score_commit_similarity(commit_hash, language)
             progress.update(analysis_task, completed=True)
 
@@ -179,7 +187,7 @@ def batch(ctx, repo_path: str, count: int, branch: str, language: str,
         ))
 
         # Initialize scorer
-        with console.status("[bold green]Initializing..."):
+        with console.status(f"[bold green]Loading {model} model..."):
             scorer = SemanticScorer(repo_path, config)
 
         # Analyze recent commits
@@ -244,11 +252,11 @@ def compare(ctx, commit_a: str, commit_b: str, repo_path: str,
         ))
 
         # Initialize scorer
-        with console.status("[bold green]Initializing..."):
+        with console.status("[bold green]Loading model and initializing..."):
             scorer = SemanticScorer(repo_path, config)
 
         # Compare commits
-        with console.status("[bold green]Comparing commits..."):
+        with console.status(f"[bold green]Comparing commits {commit_a[:8]} vs {commit_b[:8]}..."):
             comparison_result = scorer.compare_commits(commit_a, commit_b, language)
 
         # Display comparison results
@@ -306,6 +314,19 @@ def _display_analysis_results(result, detailed: bool = False):
     table.add_row("Files Analyzed", str(len(result.file_results)), "")
 
     console.print(table)
+
+    # Processing summary
+    model_info = result.model_info
+    processing_rate = len(result.file_results) / result.processing_time if result.processing_time > 0 else 0
+    console.print(Panel(
+        f"[bold]Processing Summary[/bold]\n"
+        f"Device: {model_info.get('device', 'unknown')}\n"
+        f"Model: {model_info.get('model_name', 'unknown')}\n"
+        f"Processing Rate: {processing_rate:.1f} files/second\n"
+        f"MPS Acceleration: {'✅ Active' if model_info.get('device') == 'mps' else '❌ Not used'}\n"
+        f"Cache Size: {model_info.get('cache_size', 0)} embeddings",
+        title="Performance"
+    ))
 
     # Commit information
     commit_info = result.commit_info
