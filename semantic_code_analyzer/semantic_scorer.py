@@ -39,6 +39,7 @@ class ScorerConfig:
     exclude_patterns: List[str] = None
     include_functions: bool = True
     cache_embeddings: bool = True
+    compare_against_parent: bool = True  # Default: compare against parent commit state
 
     # Output configuration
     detailed_output: bool = True
@@ -152,11 +153,20 @@ class SemanticScorer:
 
             logger.info(f"Found {len(commit_changes)} changed files in commit")
 
-            # Step 2: Get existing codebase (excluding commit files)
-            existing_codebase = self.commit_extractor.get_existing_codebase(
-                exclude_files=list(commit_changes.keys()),
-                max_files=self.config.max_files
-            )
+            # Step 2: Get existing codebase for comparison
+            if self.config.compare_against_parent:
+                # Default: Compare against parent commit state (before this commit)
+                existing_codebase = self.commit_extractor.get_codebase_at_parent_commit(
+                    commit_hash, max_files=self.config.max_files
+                )
+                logger.info("Comparing against parent commit state")
+            else:
+                # Alternative: Compare against current filesystem (excluding commit files)
+                existing_codebase = self.commit_extractor.get_existing_codebase(
+                    exclude_files=list(commit_changes.keys()),
+                    max_files=self.config.max_files
+                )
+                logger.info("Comparing against current filesystem state")
 
             if not existing_codebase:
                 logger.warning("No existing codebase files found for comparison")

@@ -90,10 +90,11 @@ def cli(ctx, verbose: bool, quiet: bool):
 @click.option('--output', '-o', type=click.Path(), help='Save results to JSON file')
 @click.option('--detailed', is_flag=True, help='Show detailed per-file analysis')
 @click.option('--no-cache', is_flag=True, help='Disable embedding caching')
+@click.option('--compare-current', is_flag=True, help='Compare against current filesystem instead of parent commit')
 @click.pass_context
 def analyze(ctx, commit_hash: str, repo_path: str, language: str, model: str,
            distance_metric: str, max_files: Optional[int], output: Optional[str],
-           detailed: bool, no_cache: bool):
+           detailed: bool, no_cache: bool, compare_current: bool):
     """
     Analyze semantic similarity of a specific commit against the codebase.
 
@@ -107,7 +108,8 @@ def analyze(ctx, commit_hash: str, repo_path: str, language: str, model: str,
             max_files=max_files,
             detailed_output=detailed,
             cache_embeddings=not no_cache,
-            save_results=bool(output)
+            save_results=bool(output),
+            compare_against_parent=not compare_current  # Default True, False if --compare-current
         )
 
         # Display analysis start

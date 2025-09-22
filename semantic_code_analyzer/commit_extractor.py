@@ -232,6 +232,80 @@ class CommitExtractor:
         logger.info(f"Loaded {len(codebase)} files from existing codebase")
         return codebase
 
+    def get_codebase_at_parent_commit(self,
+                                    commit_hash: str,
+                                    max_files: Optional[int] = None) -> Dict[str, str]:
+        """
+        Extract codebase files from the parent commit state (before target commit).
+
+        Args:
+            commit_hash: Hash of the target commit
+            max_files: Maximum number of files to process (for large codebases)
+
+        Returns:
+            Dictionary mapping file paths to their content at parent commit state
+        """
+        logger.info(f"Extracting codebase at parent of commit {commit_hash}")
+
+        try:
+            commit = self.repo.commit(commit_hash)
+        except git.BadName as e:
+            logger.error(f"Invalid commit hash {commit_hash}: {e}")
+            return {}
+
+        # Handle edge cases
+        if len(commit.parents) == 0:
+            logger.info("First commit - no parent to compare against")
+            return {}
+
+        # Get parent commit
+        parent_commit = commit.parents[0]  # Use first parent for merge commits
+        logger.info(f"Using parent commit: {parent_commit.hexsha[:8]}")
+
+        codebase = {}
+        files_processed = 0
+
+        try:
+            # Traverse the parent commit tree
+            for item in parent_commit.tree.traverse():
+                # Skip if we've hit the max files limit
+                if max_files and files_processed >= max_files:
+                    logger.info(f"Reached maximum file limit ({max_files})")
+                    break
+
+                # Only process blob objects (files, not directories)
+                if item.type != 'blob':
+                    continue
+
+                # Check if file is supported
+                if not self._is_supported_file(item.path):
+                    logger.debug(f"Skipping unsupported file: {item.path}")
+                    continue
+
+                try:
+                    # Extract file content from parent commit
+                    content = item.data_stream.read().decode('utf-8', errors='ignore')
+
+                    # Skip empty files and very large files (>1MB)
+                    if not content.strip() or len(content) > 1_000_000:
+                        logger.debug(f"Skipping empty or very large file: {item.path}")
+                        continue
+
+                    codebase[item.path] = content
+                    files_processed += 1
+                    logger.debug(f"Loaded {item.path}: {len(content)} characters")
+
+                except Exception as e:
+                    logger.warning(f"Failed to read file {item.path} from parent commit: {e}")
+                    continue
+
+        except Exception as e:
+            logger.error(f"Failed to traverse parent commit tree: {e}")
+            return {}
+
+        logger.info(f"Loaded {len(codebase)} files from parent commit state")
+        return codebase
+
     def _find_code_files(self) -> List[Path]:
         """
         Find all supported code files in the repository.
