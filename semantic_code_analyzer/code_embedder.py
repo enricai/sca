@@ -107,6 +107,10 @@ class CodeEmbedder:
         logger.info(f"Loading model: {self.config.model_name}")
 
         try:
+            # Prevent tokenizer parallelism warning
+            import os
+            os.environ["TOKENIZERS_PARALLELISM"] = "false"
+
             # Suppress model loading warnings
             import warnings
             with warnings.catch_warnings():
