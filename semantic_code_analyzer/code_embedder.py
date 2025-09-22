@@ -19,7 +19,7 @@ import pickle
 import time
 
 # Suppress transformers warnings for cleaner output
-transformers_logging.set_verbosity_warning()
+transformers_logging.set_verbosity_error()
 
 logger = logging.getLogger(__name__)
 
