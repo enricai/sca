@@ -7,7 +7,7 @@ for code semantic analysis.
 """
 
 import numpy as np
-from scipy.spatial.distance import euclidean, cosine, chebyshev, manhattan
+from scipy.spatial.distance import euclidean, cosine, chebyshev, cityblock
 from sklearn.metrics.pairwise import cosine_similarity
 from typing import Dict, List, Tuple, Optional, Union, Callable
 import logging
@@ -314,8 +314,8 @@ class SimilarityCalculator:
         return float(np.clip(similarity, -1.0, 1.0))
 
     def _manhattan_distance(self, emb1: np.ndarray, emb2: np.ndarray) -> float:
-        """Calculate similarity based on Manhattan distance."""
-        distance = manhattan(emb1, emb2)
+        """Calculate similarity based on Manhattan (L1/cityblock) distance."""
+        distance = cityblock(emb1, emb2)
         return 1.0 / (1.0 + distance)
 
     def _chebyshev_distance(self, emb1: np.ndarray, emb2: np.ndarray) -> float:
@@ -334,7 +334,7 @@ class SimilarityCalculator:
         elif self.distance_metric == DistanceMetric.COSINE:
             return cosine(emb1, emb2)
         elif self.distance_metric == DistanceMetric.MANHATTAN:
-            return manhattan(emb1, emb2)
+            return cityblock(emb1, emb2)
         elif self.distance_metric == DistanceMetric.CHEBYSHEV:
             return chebyshev(emb1, emb2)
         else:
