@@ -71,7 +71,7 @@ def cli(ctx, verbose: bool, quiet: bool):
 @click.option('--repo-path', '-r', default='.',
               help='Path to Git repository (default: current directory)')
 @click.option('--language', '-l', default='python',
-              type=click.Choice(['python', 'javascript', 'java', 'cpp', 'c', 'go']),
+              type=click.Choice(['python', 'javascript', 'typescript', 'java', 'cpp', 'c', 'go']),
               help='Programming language of the code')
 @click.option('--model', '-m', default='microsoft/graphcodebert-base',
               help='Model to use for code embeddings')
@@ -152,7 +152,7 @@ def analyze(ctx, commit_hash: str, repo_path: str, language: str, model: str,
 @click.option('--branch', '-b', default='HEAD',
               help='Branch to analyze commits from')
 @click.option('--language', '-l', default='python',
-              type=click.Choice(['python', 'javascript', 'java', 'cpp', 'c', 'go']),
+              type=click.Choice(['python', 'javascript', 'typescript', 'java', 'cpp', 'c', 'go']),
               help='Programming language of the code')
 @click.option('--model', '-m', default='microsoft/graphcodebert-base',
               help='Model to use for code embeddings')
@@ -219,7 +219,7 @@ def batch(ctx, repo_path: str, count: int, branch: str, language: str,
 @click.option('--repo-path', '-r', default='.',
               help='Path to Git repository (default: current directory)')
 @click.option('--language', '-l', default='python',
-              type=click.Choice(['python', 'javascript', 'java', 'cpp', 'c', 'go']),
+              type=click.Choice(['python', 'javascript', 'typescript', 'java', 'cpp', 'c', 'go']),
               help='Programming language of the code')
 @click.option('--output', '-o', type=click.Path(), help='Save results to JSON file')
 @click.pass_context

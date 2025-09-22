@@ -425,6 +425,8 @@ class CodeEmbedder:
             return f"# Python code:\n{code}"
         elif language.lower() in ["javascript", "js"]:
             return f"// JavaScript code:\n{code}"
+        elif language.lower() in ["typescript", "ts"]:
+            return f"// TypeScript code:\n{code}"
         elif language.lower() in ["java"]:
             return f"// Java code:\n{code}"
         elif language.lower() in ["cpp", "c++"]:
