@@ -1,0 +1,66 @@
+Base
+┏━━━━━━━━━━━━━━━━━┳━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+┃ Metric          ┃ Score  ┃ Interpretation                                ┃
+┡━━━━━━━━━━━━━━━━━╇━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┩
+│ Max Similarity  │ 0.995  │ Very High - Follows existing patterns closely │
+│ Mean Similarity │ 0.734  │ Good - Reasonably consistent with codebase    │
+│ 75th Percentile │ 0.699  │ Good - Reasonably consistent with codebase    │
+│ Processing Time │ 25.64s │                                               │
+│ Files Analyzed  │ 8      │                                               │
+└─────────────────┴────────┴───────────────────────────────────────────────┘
+
+SWE
+┏━━━━━━━━━━━━━━━━━┳━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+┃ Metric          ┃ Score  ┃ Interpretation                             ┃
+┡━━━━━━━━━━━━━━━━━╇━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┩
+│ Max Similarity  │ 0.700  │ Good - Reasonably consistent with codebase │
+│ Mean Similarity │ 0.699  │ Good - Reasonably consistent with codebase │
+│ 75th Percentile │ 0.700  │ Good - Reasonably consistent with codebase │
+│ Processing Time │ 72.34s │                                            │
+│ Files Analyzed  │ 9      │                                            │
+└─────────────────┴────────┴────────────────────────────────────────────┘
+
+Devin
+┏━━━━━━━━━━━━━━━━━┳━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+┃ Metric          ┃ Score  ┃ Interpretation                             ┃
+┡━━━━━━━━━━━━━━━━━╇━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┩
+│ Max Similarity  │ 0.700  │ Good - Reasonably consistent with codebase │
+│ Mean Similarity │ 0.698  │ Good - Reasonably consistent with codebase │
+│ 75th Percentile │ 0.699  │ Good - Reasonably consistent with codebase │
+│ Processing Time │ 51.71s │                                            │
+│ Files Analyzed  │ 5      │                                            │
+└─────────────────┴────────┴────────────────────────────────────────────┘
+
+Claude
+┏━━━━━━━━━━━━━━━━━┳━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+┃ Metric          ┃ Score  ┃ Interpretation                             ┃
+┡━━━━━━━━━━━━━━━━━╇━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┩
+│ Max Similarity  │ 0.700  │ Good - Reasonably consistent with codebase │
+│ Mean Similarity │ 0.697  │ Good - Reasonably consistent with codebase │
+│ 75th Percentile │ 0.699  │ Good - Reasonably consistent with codebase │
+│ Processing Time │ 88.43s │                                            │
+│ Files Analyzed  │ 9      │                                            │
+└─────────────────┴────────┴────────────────────────────────────────────┘
+
+Augmentedcode
+┏━━━━━━━━━━━━━━━━━┳━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+┃ Metric          ┃ Score  ┃ Interpretation                             ┃
+┡━━━━━━━━━━━━━━━━━╇━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┩
+│ Max Similarity  │ 0.700  │ Good - Reasonably consistent with codebase │
+│ Mean Similarity │ 0.698  │ Good - Reasonably consistent with codebase │
+│ 75th Percentile │ 0.699  │ Good - Reasonably consistent with codebase │
+│ Processing Time │ 79.69s │                                            │
+│ Files Analyzed  │ 15     │                                            │
+└─────────────────┴────────┴────────────────────────────────────────────┘
+
+
+Codex
+┏━━━━━━━━━━━━━━━━━┳━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+┃ Metric          ┃ Score   ┃ Interpretation                             ┃
+┡━━━━━━━━━━━━━━━━━╇━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┩
+│ Max Similarity  │ 0.699   │ Good - Reasonably consistent with codebase │
+│ Mean Similarity │ 0.697   │ Good - Reasonably consistent with codebase │
+│ 75th Percentile │ 0.698   │ Good - Reasonably consistent with codebase │
+│ Processing Time │ 110.52s │                                            │
+│ Files Analyzed  │ 6       │                                            │
+└─────────────────┴─────────┴────────────────────────────────────────────┘

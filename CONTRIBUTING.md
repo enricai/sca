@@ -1,10 +1,12 @@
-# Contributing to Semantic Code Analyzer
+# Contributing to Multi-Dimensional Code Analyzer
 
-Thank you for your interest in contributing to the Semantic Code Analyzer! This document provides guidelines and information for contributors.
+Thank you for your interest in contributing to the Multi-Dimensional Code
+Analyzer! This document provides guidelines and information for contributors.
 
 ## 🤝 Code of Conduct
 
-We are committed to providing a welcoming and inclusive environment for all contributors. Please be respectful and constructive in all interactions.
+We are committed to providing a welcoming and inclusive environment for all
+contributors. Please be respectful and constructive in all interactions.
 
 ## 🚀 Getting Started
 
@@ -12,24 +14,26 @@ We are committed to providing a welcoming and inclusive environment for all cont
 
 - **Python 3.9+** (recommended: Python 3.11 for best performance)
 - **Git** for version control
-- **Apple M3 system** (recommended) or any system with Python support
-- **16GB+ RAM** recommended for development with ML models
+- **TypeScript/JavaScript codebase** for optimal analysis results
 
 ### Development Setup
 
 1. **Fork and Clone the Repository**
+
    ```bash
    git clone https://github.com/your-username/semantic-code-analyzer.git
    cd semantic-code-analyzer
    ```
 
 2. **Create a Virtual Environment**
+
    ```bash
    python -m venv venv
    source venv/bin/activate  # On Windows: venv\Scripts\activate
    ```
 
 3. **Install Dependencies**
+
    ```bash
    # Install main dependencies
    pip install -r requirements.txt
@@ -42,11 +46,13 @@ We are committed to providing a welcoming and inclusive environment for all cont
    ```
 
 4. **Set Up Pre-commit Hooks**
+
    ```bash
    pre-commit install
    ```
 
 5. **Verify Installation**
+
    ```bash
    # Run tests
    pytest
@@ -68,25 +74,29 @@ git checkout -b fix/issue-description
 ### 2. Development Guidelines
 
 #### Code Style
+
 - **Follow PEP 8** with line length of 88 characters
 - **Use Black** for code formatting: `black semantic_code_analyzer/`
 - **Use Ruff** for linting: `ruff semantic_code_analyzer/`
 - **Use isort** for import sorting: `isort semantic_code_analyzer/`
 
 #### Type Hints
+
 - **Use type hints** for all function signatures
 - **Use mypy** for type checking: `mypy semantic_code_analyzer/`
 
 #### Documentation
+
 - **Write docstrings** for all public functions and classes
 - **Use Google-style docstrings**
 - **Update documentation** when adding new features
 
 #### Testing
+
 - **Write tests** for all new functionality
 - **Maintain 90%+ test coverage**
 - **Use pytest** for testing framework
-- **Mock external dependencies** (especially ML models)
+- **Mock external dependencies** (especially git operations)
 
 ### 3. Running Tests
 
@@ -98,13 +108,10 @@ pytest
 pytest --cov=semantic_code_analyzer --cov-report=html
 
 # Run specific test files
-pytest tests/test_semantic_scorer.py
+pytest tests/test_multi_dimensional_analysis.py
 
 # Run tests in parallel
 pytest -n auto
-
-# Run performance benchmarks
-pytest --benchmark-only
 ```
 
 ### 4. Code Quality Checks
@@ -117,13 +124,10 @@ black semantic_code_analyzer/ tests/ examples/
 isort semantic_code_analyzer/ tests/ examples/
 
 # Lint code
-ruff semantic_code_analyzer/ tests/
+ruff check semantic_code_analyzer/ tests/ examples/
 
 # Type checking
-mypy semantic_code_analyzer/
-
-# Security scanning
-bandit -r semantic_code_analyzer/
+mypy semantic_code_analyzer/ tests/ examples/
 
 # Run all checks
 pre-commit run --all-files
@@ -135,22 +139,22 @@ We follow [Conventional Commits](https://www.conventionalcommits.org/) specifica
 
 ```bash
 # Feature
-git commit -m "feat: add support for Rust language analysis"
+git commit -m "feat: add new pattern analyzer for Vue.js"
 
 # Bug fix
-git commit -m "fix: resolve embedding cache corruption issue"
+git commit -m "fix: resolve TypeScript analyzer false positives"
 
 # Documentation
-git commit -m "docs: update API documentation for SemanticScorer"
+git commit -m "docs: update API documentation for analyzers"
 
 # Tests
 git commit -m "test: add integration tests for CLI commands"
 
 # Refactor
-git commit -m "refactor: optimize similarity calculation algorithm"
+git commit -m "refactor: optimize pattern matching algorithms"
 
 # Performance
-git commit -m "perf: improve batch embedding generation speed"
+git commit -m "perf: improve batch analysis speed"
 ```
 
 ## 📝 Contribution Types
@@ -164,6 +168,7 @@ Before submitting a bug report, please:
 3. **Provide minimal reproduction** steps
 
 **Bug Report Template:**
+
 ```markdown
 ## Bug Description
 Brief description of the issue
@@ -171,8 +176,7 @@ Brief description of the issue
 ## Environment
 - OS: [e.g., macOS 14.0, Ubuntu 22.04]
 - Python Version: [e.g., 3.11.5]
-- Package Version: [e.g., 0.1.0]
-- Hardware: [e.g., Apple M3, Intel x86_64]
+- Package Version: [e.g., 0.3.0]
 
 ## Reproduction Steps
 1. Step one
@@ -182,7 +186,7 @@ Brief description of the issue
 ## Additional Context
 - Error messages
 - Log output
-- Screenshots (if applicable)
+- Code samples (if applicable)
 ```
 
 ### ✨ Feature Requests
@@ -194,6 +198,7 @@ For feature requests, please:
 3. **Provide examples** of how it would work
 
 **Feature Request Template:**
+
 ```markdown
 ## Feature Description
 Brief description of the proposed feature
@@ -214,101 +219,141 @@ How would this feature work? Any API design ideas?
 
 #### Areas for Contribution
 
-1. **Core Features**
-   - New language support
-   - Additional distance metrics
+1. **Pattern Analyzers**
+   - New framework support (Vue.js, Svelte, Angular)
+   - Additional language support (Python, Java, Go)
+   - Enhanced pattern recognition
    - Performance optimizations
-   - Memory efficiency improvements
 
-2. **Testing**
+2. **Analysis Features**
+   - Security pattern detection
+   - Performance anti-pattern recognition
+   - Accessibility analysis enhancement
+   - Code complexity metrics
+
+3. **Testing**
    - Integration tests
    - Performance benchmarks
    - Edge case coverage
    - Mock improvements
 
-3. **Documentation**
+4. **Documentation**
    - API documentation
    - Usage examples
-   - Performance guides
+   - Best practices guides
    - Troubleshooting guides
 
-4. **Developer Experience**
+5. **Developer Experience**
    - IDE integrations
    - CLI improvements
    - Error messages
-   - Logging enhancements
+   - Output formatting
 
-5. **Infrastructure**
+6. **Infrastructure**
    - CI/CD improvements
-   - Docker support
    - Package distribution
    - Security enhancements
+   - Configuration management
 
-## 🧠 Architecture Overview
+## 🏗️ Architecture Overview
 
 ### Core Components
 
-```
+```text
 semantic_code_analyzer/
-├── commit_extractor.py     # Git integration and code extraction
-├── code_embedder.py        # ML model integration with MPS acceleration
-├── similarity_calculator.py # Distance metrics and similarity algorithms
-├── semantic_scorer.py      # Main orchestration and API
-└── cli.py                 # Command-line interface
+├── __init__.py              # Main package interface
+├── cli.py                   # Command-line interface
+├── analyzers/               # Specialized pattern analyzers
+│   ├── __init__.py
+│   ├── base_analyzer.py     # Abstract base class and data structures
+│   ├── architectural_analyzer.py  # Next.js structure and imports
+│   ├── quality_analyzer.py        # Security, performance, best practices
+│   ├── typescript_analyzer.py     # Type safety and patterns
+│   └── framework_analyzer.py      # Framework-specific features
+└── scorers/                 # Scoring and aggregation
+    ├── __init__.py
+    ├── multi_dimensional_scorer.py  # Main orchestrator
+    └── weighted_aggregator.py       # Mathematical aggregation
 ```
 
 ### Key Design Principles
 
-1. **Modular Architecture** - Each component has clear responsibilities
-2. **Apple M3 Optimization** - MPS acceleration throughout
-3. **Extensibility** - Easy to add new languages and metrics
-4. **Performance** - Caching and batch processing optimizations
-5. **Testing** - Comprehensive test coverage with mocking
+1. **Pattern-Based Analysis** - Rule-based recognition of code quality patterns
+2. **Modular Architecture** - Each analyzer has clear responsibilities
+3. **Framework Awareness** - Specialized knowledge of React/Next.js/TypeScript
+4. **Extensibility** - Easy to add new analyzers and patterns
+5. **Performance** - Lightweight analysis without ML overhead
+6. **Actionable Output** - Specific recommendations for improvement
 
 ### Adding New Features
 
-#### Adding a New Programming Language
+#### Adding a New Pattern Analyzer
 
-1. **Update `SUPPORTED_EXTENSIONS`** in `commit_extractor.py`
-2. **Add language-specific preprocessing** in `code_embedder.py`
-3. **Add AST parsing support** (if applicable)
-4. **Update tests** and documentation
+1. **Create new analyzer** in `semantic_code_analyzer/analyzers/`
+2. **Inherit from `BaseAnalyzer`** and implement required methods
+3. **Define pattern recognition rules** using regex and AST analysis
+4. **Add to analyzer imports** in `analyzers/__init__.py`
+5. **Update `MultiDimensionalScorer`** to include new analyzer
+6. **Add comprehensive tests** and documentation
+
+Example:
+
+```python
+class VueAnalyzer(BaseAnalyzer):
+    def analyze_file(self, file_path: str, content: str) -> AnalysisResult:
+        patterns = []
+        recommendations = []
+
+        # Check for Vue 3 composition API
+        if "setup()" in content:
+            patterns.append(PatternMatch(...))
+
+        # Check for proper reactive declarations
+        if "ref(" in content and "reactive(" in content:
+            patterns.append(PatternMatch(...))
+
+        return AnalysisResult(...)
+```
+
+#### Adding Support for New Languages
+
+1. **Update file extension checks** in `BaseAnalyzer._get_supported_extensions()`
+2. **Add language-specific patterns** to relevant analyzers
+3. **Create language-specific analyzers** if needed
+4. **Update tests** with sample files
 5. **Add examples** for the new language
 
-#### Adding a New Distance Metric
+#### Adding New Pattern Types
 
-1. **Add enum value** to `DistanceMetric` in `similarity_calculator.py`
-2. **Implement distance function** following naming convention
-3. **Add to `_distance_functions` mapping**
-4. **Add comprehensive tests**
-5. **Update CLI options** and documentation
+1. **Add enum value** to `PatternType` in `base_analyzer.py`
+2. **Implement detection logic** in appropriate analyzer
+3. **Add scoring logic** for the new pattern type
+4. **Update tests** and documentation
 
 ## 🚨 Common Issues and Solutions
 
 ### Development Environment
 
-**Issue**: Model download fails
+**Issue**: Git repository not found
+
 ```bash
-# Solution: Check internet connection and disk space
-pip install transformers --upgrade
-python -c "from transformers import AutoModel; AutoModel.from_pretrained('microsoft/graphcodebert-base')"
+# Solution: Initialize git repo or run from git directory
+git init
+# or
+cd /path/to/git/repo
 ```
 
-**Issue**: MPS not available on Apple Silicon
-```bash
-# Solution: Update PyTorch
-pip install torch --upgrade --index-url https://download.pytorch.org/whl/cpu
-```
+**Issue**: Import errors during development
 
-**Issue**: Out of memory during testing
 ```bash
-# Solution: Use smaller test datasets or mock models
-pytest tests/ -k "not integration"
+# Solution: Install in development mode
+pip install -e .
 ```
 
 ### Code Quality
 
 **Issue**: Pre-commit hooks failing
+
 ```bash
 # Solution: Run fixes manually
 black .
@@ -317,24 +362,38 @@ ruff --fix .
 ```
 
 **Issue**: Type checking errors
+
 ```bash
-# Solution: Add type ignore for complex ML types
-# type: ignore[attr-defined]
+# Solution: Add proper type annotations
+mypy semantic_code_analyzer/ --show-error-codes
+```
+
+### Test Issues
+
+**Issue**: Tests failing due to missing fixtures
+
+```bash
+# Solution: Use provided fixtures in conftest.py
+def test_example(enhanced_scorer_config, sample_typescript_files):
+    # Test implementation
 ```
 
 ## 📚 Resources
 
-### Documentation
+### Additional Documentation
+
 - [README.md](README.md) - Project overview and usage
 - [API Documentation](semantic_code_analyzer/) - Detailed API reference
 - [Examples](examples/) - Usage examples and tutorials
 
 ### External Resources
-- [GraphCodeBERT Paper](https://arxiv.org/abs/2009.08366)
-- [Transformers Documentation](https://huggingface.co/docs/transformers)
-- [PyTorch MPS Guide](https://pytorch.org/docs/stable/notes/mps.html)
+
+- [Next.js Documentation](https://nextjs.org/docs)
+- [React Best Practices](https://react.dev/learn)
+- [TypeScript Handbook](https://www.typescriptlang.org/docs/)
 
 ### Community
+
 - **GitHub Issues** - Bug reports and feature requests
 - **GitHub Discussions** - Questions and community discussions
 - **Code Reviews** - Learning from peer feedback
@@ -342,6 +401,7 @@ ruff --fix .
 ## 🏆 Recognition
 
 Contributors will be recognized in:
+
 - **CHANGELOG.md** - All contributions noted in release notes
 - **README.md** - Major contributors listed
 - **GitHub Contributors** - Automatic recognition
@@ -358,7 +418,7 @@ Contributors will be recognized in:
 
 1. **Update version** in `pyproject.toml` and `__init__.py`
 2. **Update CHANGELOG.md** with release notes
-3. **Create release tag**: `git tag v0.2.0`
+3. **Create release tag**: `git tag v0.3.0`
 4. **Build package**: `python -m build`
 5. **Upload to PyPI**: `twine upload dist/*`
 
@@ -377,24 +437,30 @@ sca-analyze --help
 
 ## 🎯 Roadmap
 
-### Short Term (v0.2.0)
-- Enhanced language support (JavaScript, Java, C++)
-- Performance optimizations
-- Better error handling
+### Short Term (v0.4.0)
+
+- Enhanced pattern recognition for more frameworks (Vue.js, Svelte, Angular)
+- Performance optimizations for large codebases
+- Better error handling and user feedback
 - IDE integrations
 
-### Medium Term (v0.3.0)
-- Custom model fine-tuning
+### Medium Term (v0.5.0)
+
+- Additional language support (Python, Java, Go)
+- Custom pattern definition system
 - API server mode
 - Real-time analysis
 - Advanced visualization
 
 ### Long Term (v1.0.0)
+
 - Enterprise features
 - Team collaboration tools
-- Machine learning improvements
+- Custom rule definition UI
 - Cloud deployment options
+- Integration with code review tools
 
 ---
 
-Thank you for contributing to Semantic Code Analyzer! Your contributions help make code analysis better for everyone. 🚀
+Thank you for contributing to Multi-Dimensional Code Analyzer! Your
+contributions help make code quality analysis better for everyone. 🚀

@@ -1,650 +1,830 @@
 #!/usr/bin/env python3
+# MIT License
+#
+# Copyright (c) 2024 Semantic Code Analyzer Contributors
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+
 """
-Advanced usage examples for the Semantic Code Analyzer.
+Advanced usage examples for the Multi-Dimensional Code Analyzer.
 
 This script demonstrates advanced features including custom configurations,
-performance optimization, and integration with other tools.
+commit comparison, detailed pattern analysis, and integration patterns.
 """
 
-import os
-import sys
+from __future__ import annotations
+
 import json
+import sys
 import time
 from pathlib import Path
-from typing import List, Dict
+from typing import Any
 
 # Add the package to Python path for development
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from semantic_code_analyzer import SemanticScorer, ScorerConfig
-from semantic_code_analyzer.similarity_calculator import DistanceMetric
-from semantic_code_analyzer.code_embedder import EmbeddingConfig
+from semantic_code_analyzer import EnhancedScorerConfig, MultiDimensionalScorer
 
 
-def example_custom_configuration():
-    """Example of creating custom configurations for different use cases."""
-    print("🔧 Custom Configuration Examples")
+def example_commit_comparison() -> None:
+    """Advanced example of comparing multiple commits."""
+    print("🔍 Advanced Commit Comparison Example")
     print("=" * 50)
 
-    # Configuration for large codebases
-    large_codebase_config = ScorerConfig(
-        model_name="microsoft/graphcodebert-base",
-        distance_metric="euclidean",
-        max_files=500,  # Limit for performance
-        use_mps=True,
-        cache_embeddings=True,
-        normalize_embeddings=True,
-        detailed_output=False,  # Reduce output for large analysis
-        save_results=True
+    # Configuration optimized for comparison
+    config = EnhancedScorerConfig(
+        architectural_weight=0.25,
+        quality_weight=0.35,  # Emphasize quality differences
+        typescript_weight=0.25,
+        framework_weight=0.15,
+        include_pattern_details=True,
+        max_recommendations_per_file=5,
     )
 
-    # Configuration for detailed analysis
-    detailed_analysis_config = ScorerConfig(
-        model_name="microsoft/graphcodebert-base",
-        distance_metric="cosine",
-        max_files=50,
-        include_functions=True,  # Analyze individual functions
-        detailed_output=True,
-        cache_embeddings=True
-    )
+    scorer = MultiDimensionalScorer(config, repo_path=".")
 
-    # Configuration for performance benchmarking
-    benchmark_config = ScorerConfig(
-        model_name="microsoft/graphcodebert-base",
-        distance_metric="euclidean",
-        max_files=100,
-        cache_embeddings=False,  # Fresh calculations
-        normalize_embeddings=True,
-        use_mps=True
-    )
-
-    print("📋 Configuration Examples Created:")
-    print(f"   Large Codebase Config: max_files={large_codebase_config.max_files}")
-    print(f"   Detailed Analysis Config: detailed_output={detailed_analysis_config.detailed_output}")
-    print(f"   Benchmark Config: cache_embeddings={benchmark_config.cache_embeddings}")
-
-    return {
-        'large_codebase': large_codebase_config,
-        'detailed': detailed_analysis_config,
-        'benchmark': benchmark_config
-    }
-
-
-def example_performance_optimization():
-    """Example of optimizing performance for different scenarios."""
-    print("\n⚡ Performance Optimization Examples")
-    print("=" * 50)
-
-    # Fast analysis configuration
-    fast_config = ScorerConfig(
-        distance_metric="euclidean",  # Fastest metric
-        max_files=20,  # Limit file count
-        cache_embeddings=True,  # Enable caching
-        use_mps=True,  # Use Apple M3 acceleration
-        normalize_embeddings=False,  # Skip normalization
-        detailed_output=False  # Minimal output
-    )
-
-    scorer = SemanticScorer(".", fast_config)
-
+    # Get recent commits for comparison
     try:
-        # Get a commit to analyze
-        recent_commits = scorer.commit_extractor.get_commit_list(max_count=3)
-        if not recent_commits:
-            print("❌ No commits found")
-            return
+        import git
 
-        # Benchmark different configurations
-        configs = {
-            "Fast": fast_config,
-            "Cached": ScorerConfig(cache_embeddings=True, max_files=20),
-            "Uncached": ScorerConfig(cache_embeddings=False, max_files=20)
-        }
+        repo = git.Repo(".")
+        commits = [str(commit) for commit in repo.iter_commits(max_count=3)]
 
-        commit_hash = recent_commits[0].hash
-        print(f"📊 Performance comparison for commit {commit_hash}:")
+        if len(commits) >= 2:
+            base_commit = commits[0]  # Latest commit
+            compare_commits = commits[1:3]  # Previous commits
 
-        results = {}
-        for config_name, config in configs.items():
-            try:
-                scorer = SemanticScorer(".", config)
+            print("🔍 Comparing commits:")
+            print(f"   Base: {base_commit[:8]}")
+            for i, commit in enumerate(compare_commits, 1):
+                print(f"   Compare {i}: {commit[:8]}")
 
-                start_time = time.time()
-                result = scorer.score_commit_similarity(commit_hash, language="python")
-                end_time = time.time()
+            # Perform comparison
+            comparison_results = scorer.compare_commits(base_commit, compare_commits)
 
-                processing_time = end_time - start_time
-                results[config_name] = {
-                    'time': processing_time,
-                    'similarity': result.aggregate_scores['max_similarity'],
-                    'files': len(result.file_results)
-                }
+            # Display results
+            print("\n📊 Comparison Results:")
+            summary = comparison_results.get("comparison_summary", {})
 
-                print(f"   {config_name:10}: {processing_time:.2f}s | "
-                      f"Similarity: {result.aggregate_scores['max_similarity']:.3f} | "
-                      f"Files: {len(result.file_results)}")
+            base_score = summary.get("base_score", 0)
+            print(f"   Base score: {base_score:.3f}")
 
-            except Exception as e:
-                print(f"   {config_name:10}: Error - {e}")
+            comparisons = summary.get("comparisons", [])
+            for comp in comparisons:
+                commit_id = comp["commit"][:8]
+                score = comp["score"]
+                improvement = comp["improvement"]
+                percentage = comp["improvement_percentage"]
 
-        # Performance insights
-        if results:
-            fastest = min(results, key=lambda x: results[x]['time'])
-            print(f"\n🏃 Fastest configuration: {fastest} ({results[fastest]['time']:.2f}s)")
+                print(
+                    f"   {commit_id}: {score:.3f} (base +{improvement:.3f}, {percentage:.1f}% better)"
+                )
+
+                # Show dimensional improvements
+                dim_improvements = comp.get("dimensional_improvements", {})
+                if dim_improvements:
+                    print("      Dimensional improvements:")
+                    for dim, improvement in dim_improvements.items():
+                        print(f"        {dim}: +{improvement:.1f}%")
+
+        else:
+            print("⚠️  Not enough commits for comparison")
 
     except Exception as e:
-        print(f"❌ Error during performance optimization: {e}")
+        print(f"❌ Comparison failed: {e}")
 
 
-def example_similarity_analysis_pipeline():
-    """Example of a complete similarity analysis pipeline."""
-    print("\n🔄 Similarity Analysis Pipeline")
+def example_custom_configurations() -> None:
+    """Example of different configuration strategies."""
+    print("\n\n⚖️  Custom Configuration Strategies")
     print("=" * 50)
 
-    config = ScorerConfig(
-        distance_metric="euclidean",
-        max_files=30,
-        cache_embeddings=True,
-        detailed_output=True
-    )
-
-    scorer = SemanticScorer(".", config)
-
-    try:
-        # Step 1: Analyze recent commits
-        print("📊 Step 1: Analyzing recent commits...")
-        recent_results = scorer.get_recent_commits_analysis(max_commits=10, language="python")
-
-        if not recent_results:
-            print("❌ No commits found")
-            return
-
-        # Step 2: Calculate statistics
-        print("📈 Step 2: Calculating statistics...")
-        similarities = [r.aggregate_scores['max_similarity'] for r in recent_results]
-
-        stats = {
-            'mean': sum(similarities) / len(similarities),
-            'max': max(similarities),
-            'min': min(similarities),
-            'std': (sum((x - sum(similarities) / len(similarities)) ** 2 for x in similarities) / len(similarities)) ** 0.5
-        }
-
-        print(f"   Mean similarity: {stats['mean']:.3f}")
-        print(f"   Max similarity: {stats['max']:.3f}")
-        print(f"   Min similarity: {stats['min']:.3f}")
-        print(f"   Std deviation: {stats['std']:.3f}")
-
-        # Step 3: Identify outliers
-        print("🎯 Step 3: Identifying outliers...")
-        threshold = stats['mean'] - 2 * stats['std']
-        outliers = []
-
-        for result in recent_results:
-            similarity = result.aggregate_scores['max_similarity']
-            if similarity < threshold:
-                outliers.append({
-                    'commit': result.commit_info.hash,
-                    'similarity': similarity,
-                    'message': result.commit_info.message,
-                    'author': result.commit_info.author
-                })
-
-        if outliers:
-            print(f"   Found {len(outliers)} outlier commits:")
-            for outlier in outliers:
-                print(f"     {outlier['commit']}: {outlier['similarity']:.3f} - {outlier['message'][:50]}...")
-        else:
-            print("   No outliers found")
-
-        # Step 4: Generate recommendations
-        print("💡 Step 4: Generating recommendations...")
-        if stats['mean'] < 0.4:
-            print("   ⚠️  Low average similarity - consider code review process improvements")
-        elif stats['mean'] > 0.8:
-            print("   ✅ High average similarity - good consistency with codebase")
-        else:
-            print("   📊 Moderate similarity - room for improvement")
-
-        if stats['std'] > 0.3:
-            print("   ⚠️  High variability - inconsistent coding patterns")
-        else:
-            print("   ✅ Low variability - consistent coding patterns")
-
-        # Step 5: Export results
-        print("💾 Step 5: Exporting results...")
-        export_data = {
-            'analysis_timestamp': time.time(),
-            'repository_path': str(scorer.repo_path),
-            'configuration': {
-                'model_name': config.model_name,
-                'distance_metric': config.distance_metric,
-                'max_files': config.max_files
-            },
-            'statistics': stats,
-            'outliers': outliers,
-            'commits_analyzed': len(recent_results),
-            'detailed_results': [
-                {
-                    'commit_hash': r.commit_info.hash,
-                    'similarity': r.aggregate_scores['max_similarity'],
-                    'files_count': len(r.file_results),
-                    'processing_time': r.processing_time
-                }
-                for r in recent_results
-            ]
-        }
-
-        # Save to file
-        output_file = Path("similarity_analysis_pipeline.json")
-        with open(output_file, 'w') as f:
-            json.dump(export_data, f, indent=2)
-
-        print(f"   Results exported to: {output_file}")
-
-    except Exception as e:
-        print(f"❌ Error in analysis pipeline: {e}")
-
-
-def example_function_level_analysis():
-    """Example of analyzing individual functions within commits."""
-    print("\n🔍 Function-Level Analysis")
-    print("=" * 50)
-
-    config = ScorerConfig(
-        include_functions=True,
-        detailed_output=True,
-        max_files=10
-    )
-
-    scorer = SemanticScorer(".", config)
-
-    try:
-        # Get recent Python commits
-        recent_commits = scorer.commit_extractor.get_commit_list(max_count=1)
-        if not recent_commits:
-            print("❌ No commits found")
-            return
-
-        commit_hash = recent_commits[0].hash
-        print(f"📊 Analyzing functions in commit {commit_hash}...")
-
-        # Extract commit changes
-        commit_changes = scorer.commit_extractor.extract_commit_changes(commit_hash)
-
-        if not commit_changes:
-            print("❌ No code changes found in commit")
-            return
-
-        # Analyze each file's functions
-        for file_path, code in commit_changes.items():
-            if not file_path.endswith('.py'):
-                continue
-
-            print(f"\n📄 Analyzing file: {file_path}")
-
-            # Extract functions from the code
-            try:
-                functions = scorer.code_embedder.get_function_embeddings(code, "python")
-
-                if not functions:
-                    print("   No functions found")
-                    continue
-
-                print(f"   Found {len(functions)} functions:")
-
-                for func in functions:
-                    print(f"     - {func.name} (lines {func.line_start}-{func.line_end})")
-
-                    # Get similarity for this function
-                    if func.embedding is not None:
-                        # Compare against existing codebase
-                        existing_codebase = scorer.commit_extractor.get_existing_codebase(
-                            exclude_files=[file_path], max_files=20
-                        )
-
-                        if existing_codebase:
-                            codebase_embeddings = []
-                            for cb_code in existing_codebase.values():
-                                try:
-                                    embedding = scorer.code_embedder.get_code_embedding(cb_code, "python")
-                                    codebase_embeddings.append(embedding)
-                                except:
-                                    continue
-
-                            if codebase_embeddings:
-                                similarity_result = scorer.similarity_calculator.calculate_similarity_score(
-                                    func.embedding, codebase_embeddings, return_details=True
-                                )
-                                print(f"       Similarity: {similarity_result.max_similarity:.3f}")
-
-            except Exception as e:
-                print(f"   Error analyzing functions: {e}")
-
-    except Exception as e:
-        print(f"❌ Error in function-level analysis: {e}")
-
-
-def example_cross_repository_comparison():
-    """Example of comparing commits across different repositories."""
-    print("\n🔄 Cross-Repository Comparison")
-    print("=" * 50)
-
-    # This example would require access to multiple repositories
-    # For demo purposes, we'll show the structure
-
-    config = ScorerConfig(
-        distance_metric="euclidean",
-        max_files=20,
-        cache_embeddings=True
-    )
-
-    print("📋 Cross-repository comparison structure:")
-    print("   1. Initialize scorers for each repository")
-    print("   2. Extract embeddings from commits in each repo")
-    print("   3. Calculate cross-repository similarity matrix")
-    print("   4. Identify similar patterns across projects")
-
-    # Example structure (would require actual repositories)
-    repository_paths = [
-        ".",  # Current repository
-        # "/path/to/repo2",
-        # "/path/to/repo3"
+    configurations = [
+        {
+            "name": "Architecture Focus",
+            "description": "Emphasizes file structure and imports",
+            "config": EnhancedScorerConfig(
+                architectural_weight=0.50,
+                quality_weight=0.20,
+                typescript_weight=0.20,
+                framework_weight=0.10,
+            ),
+        },
+        {
+            "name": "Quality Focus",
+            "description": "Emphasizes best practices and security",
+            "config": EnhancedScorerConfig(
+                architectural_weight=0.15,
+                quality_weight=0.50,
+                typescript_weight=0.25,
+                framework_weight=0.10,
+            ),
+        },
+        {
+            "name": "TypeScript Focus",
+            "description": "Emphasizes type safety and TS patterns",
+            "config": EnhancedScorerConfig(
+                architectural_weight=0.20,
+                quality_weight=0.20,
+                typescript_weight=0.50,
+                framework_weight=0.10,
+            ),
+        },
+        {
+            "name": "Framework Focus",
+            "description": "Emphasizes Next.js and React patterns",
+            "config": EnhancedScorerConfig(
+                architectural_weight=0.20,
+                quality_weight=0.20,
+                typescript_weight=0.15,
+                framework_weight=0.45,
+            ),
+        },
     ]
 
-    print(f"\n📊 Analyzing {len(repository_paths)} repositories:")
+    # Test file with various patterns
+    test_file = {
+        "src/app/api/users/route.ts": """
+import { NextRequest, NextResponse } from 'next/server';
 
-    for i, repo_path in enumerate(repository_paths):
-        try:
-            scorer = SemanticScorer(repo_path, config)
-            recent_commits = scorer.commit_extractor.get_commit_list(max_count=3)
+interface User {
+    id: string;
+    name: string;
+    email: string;
+}
 
-            print(f"   Repository {i+1}: {repo_path}")
-            print(f"     Recent commits: {len(recent_commits)}")
+export async function GET(request: NextRequest): Promise<NextResponse> {
+    try {
+        const users: User[] = [
+            { id: '1', name: 'John', email: 'john@example.com' },
+            { id: '2', name: 'Jane', email: 'jane@example.com' }
+        ];
 
-            if recent_commits:
-                # Analyze latest commit
-                latest = recent_commits[0]
-                result = scorer.score_commit_similarity(latest.hash, language="python")
-                print(f"     Latest commit similarity: {result.aggregate_scores['max_similarity']:.3f}")
+        return NextResponse.json(users, { status: 200 });
+    } catch (error) {
+        console.error('Error fetching users:', error);
+        return NextResponse.json(
+            { error: 'Internal server error' },
+            { status: 500 }
+        );
+    }
+}
 
-        except Exception as e:
-            print(f"   Repository {i+1}: Error - {e}")
+export async function POST(request: NextRequest): Promise<NextResponse> {
+    try {
+        const body = await request.json();
 
-    print("\n💡 Note: Full cross-repository comparison requires multiple repos")
+        if (!body.name || !body.email) {
+            return NextResponse.json(
+                { error: 'Name and email are required' },
+                { status: 400 }
+            );
+        }
+
+        const newUser: User = {
+            id: Math.random().toString(36),
+            name: body.name,
+            email: body.email
+        };
+
+        return NextResponse.json(newUser, { status: 201 });
+    } catch (error) {
+        console.error('Error creating user:', error);
+        return NextResponse.json(
+            { error: 'Internal server error' },
+            { status: 500 }
+        );
+    }
+}
+"""
+    }
+
+    print("📊 Comparing different focus configurations:")
+    print(
+        f"{'Configuration':<18} {'Overall':<10} {'Arch':<8} {'Quality':<8} {'TS':<8} {'Framework':<10}"
+    )
+    print("-" * 72)
+
+    for config_info in configurations:
+        config_name = config_info["name"]
+        config = config_info["config"]
+        if not isinstance(config, EnhancedScorerConfig):
+            raise TypeError(f"Expected EnhancedScorerConfig, got {type(config)}")
+
+        scorer = MultiDimensionalScorer(config, repo_path=".")
+        results = scorer.analyze_files(test_file)
+
+        overall = results["overall_adherence"]
+        dims = results.get("dimensional_scores", {})
+
+        print(
+            f"{config_name:<18} {overall:<10.3f} {dims.get('architectural', 0):<8.3f} "
+            f"{dims.get('quality', 0):<8.3f} {dims.get('typescript', 0):<8.3f} "
+            f"{dims.get('framework', 0):<8.3f}"
+        )
+
+    print("\n💡 Key insight: Weight configuration significantly impacts scoring")
+    print("   Choose weights based on your project's priorities and standards.")
 
 
-def example_integration_with_ci_cd():
-    """Example of integrating SCA with CI/CD pipelines."""
-    print("\n🔗 CI/CD Integration Example")
+def example_pattern_analysis() -> None:
+    """Example of detailed pattern analysis and insights."""
+    print("\n\n🔬 Detailed Pattern Analysis Example")
     print("=" * 50)
 
-    def check_commit_quality(commit_hash: str, threshold: float = 0.3) -> Dict:
+    # Enable all detailed options
+    config = EnhancedScorerConfig(
+        include_pattern_details=True,
+        include_actionable_feedback=True,
+        max_recommendations_per_file=15,
+    )
+
+    # Complex example showcasing many patterns
+    complex_files = {
+        "src/components/UserDashboard.tsx": """
+'use client';
+
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import { useRouter } from 'next/navigation';
+
+interface User {
+    id: string;
+    name: string;
+    email: string;
+    role: 'admin' | 'user';
+    avatar?: string;
+}
+
+interface UserDashboardProps {
+    initialUser?: User;
+    onUserUpdate?: (user: User) => void;
+}
+
+const UserDashboard: React.FC<UserDashboardProps> = ({ initialUser, onUserUpdate }) => {
+    const [user, setUser] = useState<User | null>(initialUser || null);
+    const [loading, setLoading] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+    const router = useRouter();
+
+    // Fetch user data
+    const fetchUser = useCallback(async (userId: string) => {
+        try {
+            setLoading(true);
+            setError(null);
+
+            const response = await fetch(`/api/users/${userId}`);
+
+            if (!response.ok) {
+                throw new Error('Failed to fetch user');
+            }
+
+            const userData = await response.json();
+            setUser(userData);
+            onUserUpdate?.(userData);
+
+        } catch (err) {
+            setError(err instanceof Error ? err.message : 'Unknown error');
+        } finally {
+            setLoading(false);
+        }
+    }, [onUserUpdate]);
+
+    // Memoized computed values
+    const displayName = useMemo(() => {
+        return user?.name || 'Unknown User';
+    }, [user?.name]);
+
+    const isAdmin = useMemo(() => {
+        return user?.role === 'admin';
+    }, [user?.role]);
+
+    // Handle navigation
+    const handleProfileEdit = useCallback(() => {
+        if (user) {
+            router.push(`/users/${user.id}/edit`);
+        }
+    }, [user, router]);
+
+    // Loading state
+    if (loading) {
+        return (
+            <div role="status" aria-label="Loading user dashboard">
+                <div className="loading-spinner" />
+                <span className="sr-only">Loading...</span>
+            </div>
+        );
+    }
+
+    // Error state
+    if (error) {
+        return (
+            <div role="alert" className="error-container">
+                <h2>Error Loading Dashboard</h2>
+                <p>{error}</p>
+                <button onClick={() => setError(null)}>
+                    Try Again
+                </button>
+            </div>
+        );
+    }
+
+    // No user state
+    if (!user) {
+        return (
+            <div className="no-user">
+                <h2>No User Data</h2>
+                <p>Please log in to view your dashboard.</p>
+            </div>
+        );
+    }
+
+    return (
+        <main role="main" className="user-dashboard">
+            <header className="dashboard-header">
+                <div className="user-info">
+                    {user.avatar && (
+                        <img
+                            src={user.avatar}
+                            alt={`Profile picture for ${displayName}`}
+                            className="user-avatar"
+                            loading="lazy"
+                        />
+                    )}
+                    <div>
+                        <h1>{displayName}</h1>
+                        <p className="user-email">{user.email}</p>
+                        {isAdmin && (
+                            <span className="admin-badge" role="status">
+                                Administrator
+                            </span>
+                        )}
+                    </div>
+                </div>
+
+                <nav className="dashboard-actions" role="navigation">
+                    <button
+                        onClick={handleProfileEdit}
+                        className="edit-profile-btn"
+                        aria-label={`Edit profile for ${displayName}`}
+                    >
+                        Edit Profile
+                    </button>
+                </nav>
+            </header>
+
+            <section className="dashboard-content">
+                <h2>Dashboard Overview</h2>
+                <p>Welcome to your dashboard, {displayName}!</p>
+            </section>
+        </main>
+    );
+};
+
+export default UserDashboard;
+""",
+        "src/app/[locale]/layout.tsx": """
+import type { Metadata } from "next";
+import { NextIntlClientProvider } from "next-intl";
+import { notFound } from "next/navigation";
+import React from "react";
+
+export const metadata: Metadata = {
+    title: {
+        template: '%s | MyApp',
+        default: 'MyApp - User Management'
+    },
+    description: 'Advanced user management application',
+    keywords: ['users', 'management', 'dashboard'],
+    authors: [{ name: 'Development Team' }],
+    openGraph: {
+        title: 'MyApp User Management',
+        description: 'Advanced user management application',
+        type: 'website'
+    }
+};
+
+interface RootLayoutProps {
+    children: React.ReactNode;
+    params: { locale: string };
+}
+
+const locales = ['en', 'es', 'fr'];
+
+export default async function RootLayout({
+    children,
+    params: { locale }
+}: RootLayoutProps): Promise<React.ReactElement> {
+    // Validate locale
+    if (!locales.includes(locale)) {
+        notFound();
+    }
+
+    let messages;
+    try {
+        messages = (await import(`../../messages/${locale}.json`)).default;
+    } catch (error) {
+        console.error(`Failed to load messages for locale ${locale}:`, error);
+        notFound();
+    }
+
+    return (
+        <html lang={locale}>
+            <head>
+                <meta name="viewport" content="width=device-width, initial-scale=1" />
+                <link rel="icon" href="/favicon.ico" />
+            </head>
+            <body>
+                <NextIntlClientProvider
+                    locale={locale}
+                    messages={messages}
+                    timeZone="UTC"
+                >
+                    <div id="app-root">
+                        {children}
+                    </div>
+                </NextIntlClientProvider>
+            </body>
+        </html>
+    );
+}
+
+export function generateStaticParams() {
+    return locales.map((locale) => ({ locale }));
+}
+""",
+    }
+
+    scorer = MultiDimensionalScorer(config, repo_path=".")
+    results = scorer.analyze_files(complex_files)
+
+    print("📊 Detailed Analysis Results:")
+    print(f"   Overall adherence: {results['overall_adherence']:.3f}")
+    print(f"   Confidence: {results['confidence']:.3f}")
+
+    # Show pattern breakdown
+    pattern_analysis = results.get("pattern_analysis", {})
+    if pattern_analysis:
+        print("\n🔍 Pattern Analysis:")
+        print(f"   Total patterns: {pattern_analysis.get('total_patterns_found', 0)}")
+        print(
+            f"   Avg confidence: {pattern_analysis.get('pattern_confidence_avg', 0):.3f}"
+        )
+
+        patterns_by_type = pattern_analysis.get("patterns_by_type", {})
+        if patterns_by_type:
+            print("   Patterns by type:")
+            for pattern_type, count in patterns_by_type.items():
+                print(f"      {pattern_type}: {count}")
+
+    # Show detailed recommendations
+    feedback = results.get("actionable_feedback", [])
+    if feedback:
+        print(f"\n💡 Actionable Feedback ({len(feedback)} items):")
+
+        # Group by severity
+        by_severity: dict[str, list[dict[str, Any]]] = {}
+        for rec in feedback:
+            severity = rec["severity"]
+            if severity not in by_severity:
+                by_severity[severity] = []
+            by_severity[severity].append(rec)
+
+        for severity in ["critical", "error", "warning", "info"]:
+            if severity in by_severity:
+                print(f"   {severity.upper()} ({len(by_severity[severity])}):")
+                for rec in by_severity[severity][:3]:  # Show top 3 per severity
+                    print(f"      • {rec['message']}")
+                    if rec.get("suggested_fix"):
+                        print(f"        Fix: {rec['suggested_fix']}")
+
+
+def example_configuration_tuning() -> None:
+    """Example of tuning configuration for specific project needs."""
+    print("\n\n⚙️  Configuration Tuning Example")
+    print("=" * 50)
+
+    # Different project types need different configurations
+    project_configs = {
+        "Frontend Heavy": EnhancedScorerConfig(
+            architectural_weight=0.25,
+            quality_weight=0.25,
+            typescript_weight=0.25,
+            framework_weight=0.25,  # Equal emphasis on React/Next.js
+        ),
+        "API Heavy": EnhancedScorerConfig(
+            architectural_weight=0.35,  # API structure important
+            quality_weight=0.35,  # Security/error handling critical
+            typescript_weight=0.25,  # Type safety for APIs
+            framework_weight=0.05,  # Less framework-specific patterns
+        ),
+        "Type-Safe Focus": EnhancedScorerConfig(
+            architectural_weight=0.20,
+            quality_weight=0.25,
+            typescript_weight=0.45,  # Heavy emphasis on TypeScript
+            framework_weight=0.10,
+        ),
+        "Prototype/MVP": EnhancedScorerConfig(
+            architectural_weight=0.40,  # Structure important for growth
+            quality_weight=0.40,  # Basic quality standards
+            typescript_weight=0.15,  # Less strict typing for speed
+            framework_weight=0.05,  # Basic framework usage
+        ),
+    }
+
+    # Test with a typical component
+    test_component = {
+        "src/components/UserCard.tsx": """
+'use client';
+
+import React from 'react';
+
+interface UserCardProps {
+    user: {
+        id: string;
+        name: string;
+        email: string;
+        avatar?: string;
+    };
+    onEdit?: () => void;
+}
+
+const UserCard: React.FC<UserCardProps> = ({ user, onEdit }) => {
+    return (
+        <div className="user-card">
+            <div className="user-info">
+                <h3>{user.name}</h3>
+                <p>{user.email}</p>
+            </div>
+            {onEdit && (
+                <button onClick={onEdit} className="edit-btn">
+                    Edit
+                </button>
+            )}
+        </div>
+    );
+};
+
+export default UserCard;
+"""
+    }
+
+    print("📊 Configuration comparison for the same code:")
+    print(
+        f"{'Project Type':<15} {'Overall':<10} {'Arch':<8} {'Quality':<8} {'TS':<8} {'Framework':<10}"
+    )
+    print("-" * 70)
+
+    for project_type, config in project_configs.items():
+        scorer = MultiDimensionalScorer(config, repo_path=".")
+        results = scorer.analyze_files(test_component)
+
+        overall = results["overall_adherence"]
+        dims = results.get("dimensional_scores", {})
+
+        print(
+            f"{project_type:<15} {overall:<10.3f} {dims.get('architectural', 0):<8.3f} "
+            f"{dims.get('quality', 0):<8.3f} {dims.get('typescript', 0):<8.3f} "
+            f"{dims.get('framework', 0):<8.3f}"
+        )
+
+    print("\n🎯 Insight: Same code scores differently based on project priorities")
+
+
+def example_ci_cd_integration() -> None:
+    """Example of integrating with CI/CD pipelines."""
+    print("\n\n🔗 CI/CD Integration Example")
+    print("=" * 50)
+
+    def quality_gate_check(commit_hash: str, min_score: float = 0.7) -> dict[str, Any]:
         """
-        Check if a commit meets quality standards.
+        Quality gate check for CI/CD pipeline.
 
         Args:
-            commit_hash: Hash of commit to check
-            threshold: Minimum similarity threshold
+            commit_hash: Commit to check
+            min_score: Minimum acceptable score
 
         Returns:
-            Dictionary with check results
+            Check results with pass/fail status
         """
-        config = ScorerConfig(
-            distance_metric="euclidean",
-            max_files=50,
-            cache_embeddings=True,
-            detailed_output=False
+        config = EnhancedScorerConfig(
+            architectural_weight=0.30,
+            quality_weight=0.40,  # Emphasize quality for gates
+            typescript_weight=0.25,
+            framework_weight=0.05,
+            max_recommendations_per_file=3,  # Limit for CI output
         )
 
         try:
-            scorer = SemanticScorer(".", config)
-            result = scorer.score_commit_similarity(commit_hash, language="python")
+            scorer = MultiDimensionalScorer(config, repo_path=".")
+            results = scorer.analyze_commit(commit_hash)
 
-            similarity = result.aggregate_scores['max_similarity']
-            passed = similarity >= threshold
+            overall_score = results["overall_adherence"]
+            passed = overall_score >= min_score
 
             return {
-                'commit_hash': commit_hash,
-                'similarity_score': similarity,
-                'threshold': threshold,
-                'passed': passed,
-                'files_analyzed': len(result.file_results),
-                'processing_time': result.processing_time,
-                'recommendation': _get_recommendation(similarity)
+                "commit_hash": commit_hash,
+                "overall_score": overall_score,
+                "min_score": min_score,
+                "passed": passed,
+                "dimensional_scores": results.get("dimensional_scores", {}),
+                "confidence": results.get("confidence", 0),
+                "critical_issues": [
+                    rec
+                    for rec in results.get("actionable_feedback", [])
+                    if rec["severity"] in ["critical", "error"]
+                ],
+                "files_analyzed": len(results.get("file_level_analysis", {})),
+                "processing_time": results.get("processing_time", 0),
             }
 
         except Exception as e:
-            return {
-                'commit_hash': commit_hash,
-                'error': str(e),
-                'passed': False
-            }
+            return {"commit_hash": commit_hash, "error": str(e), "passed": False}
 
-    def _get_recommendation(similarity: float) -> str:
-        """Get recommendation based on similarity score."""
-        if similarity >= 0.8:
-            return "Excellent - Code follows established patterns"
-        elif similarity >= 0.6:
-            return "Good - Minor style variations"
-        elif similarity >= 0.4:
-            return "Acceptable - Consider code review"
-        elif similarity >= 0.2:
-            return "Warning - Significant style differences"
-        else:
-            return "Alert - Major style inconsistencies"
-
-    # Example CI/CD check
+    # Example usage in CI/CD
     try:
-        scorer = SemanticScorer(".", ScorerConfig())
-        recent_commits = scorer.commit_extractor.get_commit_list(max_count=1)
+        import git
 
-        if recent_commits:
-            commit_hash = recent_commits[0].hash
-            print(f"🔍 Running CI/CD quality check for commit {commit_hash}...")
+        repo = git.Repo(".")
+        latest_commit = str(repo.head.commit)
 
-            check_result = check_commit_quality(commit_hash, threshold=0.3)
+        print(f"🔍 Running quality gate for commit: {latest_commit[:8]}")
 
-            print("\n📊 Quality Check Results:")
-            if 'error' in check_result:
-                print(f"   ❌ Error: {check_result['error']}")
-                print("   Exit code: 1")
-            else:
-                status = "✅ PASSED" if check_result['passed'] else "❌ FAILED"
-                print(f"   Status: {status}")
-                print(f"   Similarity Score: {check_result['similarity_score']:.3f}")
-                print(f"   Threshold: {check_result['threshold']}")
-                print(f"   Files Analyzed: {check_result['files_analyzed']}")
-                print(f"   Processing Time: {check_result['processing_time']:.2f}s")
-                print(f"   Recommendation: {check_result['recommendation']}")
+        check_result = quality_gate_check(latest_commit, min_score=0.7)
 
-                exit_code = 0 if check_result['passed'] else 1
-                print(f"   Exit code: {exit_code}")
-
-                # Example of saving results for CI/CD systems
-                ci_output = {
-                    'semantic_analysis': check_result,
-                    'ci_metadata': {
-                        'pipeline_id': 'example-pipeline-123',
-                        'build_number': 456,
-                        'timestamp': time.time()
-                    }
-                }
-
-                with open('ci_semantic_analysis.json', 'w') as f:
-                    json.dump(ci_output, f, indent=2)
-
-                print("   Results saved to: ci_semantic_analysis.json")
-
+        print("\n📊 Quality Gate Results:")
+        if "error" in check_result:
+            print(f"   ❌ ERROR: {check_result['error']}")
+            print("   Exit code: 1")
         else:
-            print("❌ No commits found for CI/CD check")
+            status = "✅ PASSED" if check_result["passed"] else "❌ FAILED"
+            print(f"   Status: {status}")
+            print(f"   Overall Score: {check_result['overall_score']:.3f}")
+            print(f"   Required Score: {check_result['min_score']}")
+            print(f"   Confidence: {check_result['confidence']:.3f}")
+
+            # Show dimensional breakdown
+            dims = check_result["dimensional_scores"]
+            print("   Dimensional Scores:")
+            for dim, score in dims.items():
+                print(f"      {dim}: {score:.3f}")
+
+            # Show critical issues
+            critical_issues = check_result["critical_issues"]
+            if critical_issues:
+                print(f"   ⚠️  Critical Issues ({len(critical_issues)}):")
+                for issue in critical_issues:
+                    print(f"      • {issue['message']}")
+
+            exit_code = 0 if check_result["passed"] else 1
+            print(f"   Exit code: {exit_code}")
+
+        # Save results for CI/CD system
+        ci_results = {
+            "quality_gate": check_result,
+            "pipeline_metadata": {
+                "timestamp": time.time(),
+                "commit": latest_commit,
+                "repository": str(Path.cwd()),
+            },
+        }
+
+        with open("quality_gate_results.json", "w") as f:
+            json.dump(ci_results, f, indent=2, default=str)
+
+        print("   Results saved to: quality_gate_results.json")
 
     except Exception as e:
-        print(f"❌ Error in CI/CD integration: {e}")
+        print(f"❌ CI/CD integration failed: {e}")
 
 
-def example_custom_analysis_workflow():
-    """Example of creating a custom analysis workflow."""
-    print("\n🎯 Custom Analysis Workflow")
+def example_batch_analysis() -> None:
+    """Example of analyzing multiple commits in batch."""
+    print("\n\n📦 Batch Analysis Example")
     print("=" * 50)
 
-    class CustomAnalysisWorkflow:
-        """Custom workflow for specialized analysis needs."""
+    config = EnhancedScorerConfig(
+        include_actionable_feedback=False,  # Reduce output for batch
+        include_pattern_details=False,
+    )
 
-        def __init__(self, repo_path: str):
-            self.repo_path = repo_path
-            self.config = ScorerConfig(
-                distance_metric="euclidean",
-                max_files=100,
-                cache_embeddings=True
-            )
-            self.scorer = SemanticScorer(repo_path, self.config)
+    scorer = MultiDimensionalScorer(config, repo_path=".")
 
-        def analyze_commits_by_author(self, author: str, max_commits: int = 10):
-            """Analyze commits by a specific author."""
-            print(f"👤 Analyzing commits by {author}...")
+    try:
+        import git
 
-            # Get all recent commits
-            all_commits = self.scorer.commit_extractor.get_commit_list(max_count=50)
+        repo = git.Repo(".")
+        commits = [str(commit) for commit in repo.iter_commits(max_count=5)]
 
-            # Filter by author
-            author_commits = [c for c in all_commits if author.lower() in c.author.lower()][:max_commits]
+        print(f"📊 Batch analyzing {len(commits)} commits:")
 
-            if not author_commits:
-                print(f"   No commits found for author: {author}")
-                return []
+        batch_results = []
+        for i, commit_hash in enumerate(commits, 1):
+            try:
+                print(f"   {i}/{len(commits)}: {commit_hash[:8]}...", end=" ")
 
-            print(f"   Found {len(author_commits)} commits by {author}")
+                start_time = time.time()
+                result = scorer.analyze_commit(commit_hash)
+                analysis_time = time.time() - start_time
 
-            # Analyze each commit
-            results = []
-            for commit in author_commits:
-                try:
-                    result = self.scorer.score_commit_similarity(commit.hash, language="python")
-                    results.append({
-                        'commit': commit,
-                        'result': result
-                    })
-                except Exception as e:
-                    print(f"   Error analyzing {commit.hash}: {e}")
-
-            return results
-
-        def compare_time_periods(self, days_ago_1: int = 30, days_ago_2: int = 90):
-            """Compare similarity patterns between different time periods."""
-            print(f"⏰ Comparing commits from {days_ago_1} vs {days_ago_2} days ago...")
-
-            import datetime
-
-            # Get recent commits
-            all_commits = self.scorer.commit_extractor.get_commit_list(max_count=100)
-
-            now = datetime.datetime.now()
-            period_1_cutoff = now - datetime.timedelta(days=days_ago_1)
-            period_2_cutoff = now - datetime.timedelta(days=days_ago_2)
-
-            # Note: This is simplified - actual implementation would parse commit timestamps
-            period_1_commits = all_commits[:10]  # Recent commits
-            period_2_commits = all_commits[10:20]  # Older commits
-
-            print(f"   Period 1 (recent): {len(period_1_commits)} commits")
-            print(f"   Period 2 (older): {len(period_2_commits)} commits")
-
-            # Analyze both periods
-            results = {}
-            for period_name, commits in [("recent", period_1_commits), ("older", period_2_commits)]:
-                similarities = []
-                for commit in commits[:5]:  # Limit for demo
-                    try:
-                        result = self.scorer.score_commit_similarity(commit.hash, language="python")
-                        similarities.append(result.aggregate_scores['max_similarity'])
-                    except:
-                        continue
-
-                if similarities:
-                    results[period_name] = {
-                        'mean': sum(similarities) / len(similarities),
-                        'max': max(similarities),
-                        'min': min(similarities),
-                        'count': len(similarities)
+                batch_results.append(
+                    {
+                        "commit": commit_hash,
+                        "overall_score": result["overall_adherence"],
+                        "dimensional_scores": result["dimensional_scores"],
+                        "analysis_time": analysis_time,
+                        "patterns_found": result.get("pattern_analysis", {}).get(
+                            "total_patterns_found", 0
+                        ),
                     }
+                )
 
-            # Compare results
-            if len(results) == 2:
-                recent_mean = results['recent']['mean']
-                older_mean = results['older']['mean']
-                improvement = recent_mean - older_mean
+                print(f"✅ {result['overall_adherence']:.3f} ({analysis_time:.1f}s)")
 
-                print(f"   Recent period mean similarity: {recent_mean:.3f}")
-                print(f"   Older period mean similarity: {older_mean:.3f}")
-                print(f"   Improvement: {improvement:+.3f}")
+            except Exception as e:
+                print(f"❌ Failed: {e}")
 
-                if improvement > 0.1:
-                    print("   📈 Significant improvement in code consistency")
-                elif improvement < -0.1:
-                    print("   📉 Decline in code consistency")
-                else:
-                    print("   📊 Stable code consistency")
+        # Analyze batch results
+        if batch_results:
+            print("\n📈 Batch Analysis Summary:")
 
-    # Run custom workflow
-    try:
-        workflow = CustomAnalysisWorkflow(".")
+            overall_scores = [r["overall_score"] for r in batch_results]
+            avg_score = sum(overall_scores) / len(overall_scores)
+            max_score = max(overall_scores)
+            min_score = min(overall_scores)
 
-        # Example: Analyze commits by author
-        scorer = SemanticScorer(".", ScorerConfig())
-        recent_commits = scorer.commit_extractor.get_commit_list(max_count=5)
+            print(f"   Average score: {avg_score:.3f}")
+            print(f"   Score range: {min_score:.3f} - {max_score:.3f}")
 
-        if recent_commits:
-            # Get the most recent author
-            recent_author = recent_commits[0].author
-            author_results = workflow.analyze_commits_by_author(recent_author, max_commits=3)
+            # Find best and worst commits
+            best_commit = max(batch_results, key=lambda r: r["overall_score"])
+            worst_commit = min(batch_results, key=lambda r: r["overall_score"])
 
-            if author_results:
-                similarities = [r['result'].aggregate_scores['max_similarity'] for r in author_results]
-                avg_similarity = sum(similarities) / len(similarities)
-                print(f"   Average similarity for {recent_author}: {avg_similarity:.3f}")
+            print(
+                f"   Best commit: {best_commit['commit'][:8]} ({best_commit['overall_score']:.3f})"
+            )
+            print(
+                f"   Worst commit: {worst_commit['commit'][:8]} ({worst_commit['overall_score']:.3f})"
+            )
 
-        # Example: Compare time periods
-        workflow.compare_time_periods()
+            # Save batch results
+            with open("batch_analysis_results.json", "w") as f:
+                json.dump(
+                    {
+                        "summary": {
+                            "commits_analyzed": len(batch_results),
+                            "average_score": avg_score,
+                            "score_range": [min_score, max_score],
+                        },
+                        "detailed_results": batch_results,
+                    },
+                    f,
+                    indent=2,
+                    default=str,
+                )
+
+            print("   Results saved to: batch_analysis_results.json")
 
     except Exception as e:
-        print(f"❌ Error in custom workflow: {e}")
-
-
-def main():
-    """Run all advanced examples."""
-    print("🚀 Semantic Code Analyzer - Advanced Usage Examples")
-    print("=" * 70)
-
-    # Check if we're in a git repository
-    if not Path(".git").exists():
-        print("❌ This script must be run from within a Git repository")
-        return
-
-    try:
-        # Run advanced examples
-        example_custom_configuration()
-        example_performance_optimization()
-        example_similarity_analysis_pipeline()
-        example_function_level_analysis()
-        example_cross_repository_comparison()
-        example_integration_with_ci_cd()
-        example_custom_analysis_workflow()
-
-        print("\n🎉 All advanced examples completed!")
-        print("\nAdvanced Features Demonstrated:")
-        print("   ✅ Custom configurations for different use cases")
-        print("   ✅ Performance optimization techniques")
-        print("   ✅ Complete analysis pipelines")
-        print("   ✅ Function-level analysis")
-        print("   ✅ CI/CD integration patterns")
-        print("   ✅ Custom workflow development")
-
-    except KeyboardInterrupt:
-        print("\n⏹️ Examples interrupted by user")
-    except Exception as e:
-        print(f"\n❌ Unexpected error: {e}")
+        print(f"❌ Batch analysis failed: {e}")
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        example_commit_comparison()
+        example_custom_configurations()
+        example_pattern_analysis()
+        example_configuration_tuning()
+        example_ci_cd_integration()
+        example_batch_analysis()
+
+        print("\n🎉 All advanced examples completed successfully!")
+        print("\n🚀 Advanced Features Demonstrated:")
+        print("   ✅ Multi-commit comparison")
+        print("   ✅ Custom configuration strategies")
+        print("   ✅ Detailed pattern analysis")
+        print("   ✅ CI/CD quality gates")
+        print("   ✅ Batch processing")
+        print("   ✅ Project-specific tuning")
+
+    except Exception as e:
+        print(f"❌ Advanced example failed: {e}")
+        import traceback
+
+        traceback.print_exc()
+        sys.exit(1)

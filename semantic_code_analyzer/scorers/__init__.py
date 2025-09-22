@@ -20,9 +20,18 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
-"""
-Test suite for Semantic Code Analyzer.
+"""Multi-dimensional scoring modules.
 
-This package contains comprehensive tests for all components of the semantic
-code analyzer, including unit tests, integration tests, and performance tests.
+This package provides scoring orchestration and aggregation for
+the various code analysis dimensions.
 """
+
+from .multi_dimensional_scorer import EnhancedScorerConfig, MultiDimensionalScorer
+from .weighted_aggregator import AggregatedResult, WeightedAggregator
+
+__all__ = [
+    "MultiDimensionalScorer",
+    "EnhancedScorerConfig",
+    "WeightedAggregator",
+    "AggregatedResult",
+]

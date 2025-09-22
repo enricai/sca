@@ -15,14 +15,14 @@ repos:
       - id: check-xml
       - id: check-merge-conflict
       - id: check-added-large-files
-        args: ['--maxkb=10000']  # 10MB limit
+        args: ["--maxkb=10000"] # 10MB limit
       - id: check-case-conflict
       - id: check-executables-have-shebangs
       - id: check-shebang-scripts-are-executable
       - id: debug-statements
       - id: fix-byte-order-marker
       - id: mixed-line-ending
-        args: ['--fix=lf']
+        args: ["--fix=lf"]
 
   # Python-specific hooks
   - repo: https://github.com/pre-commit/pre-commit-hooks
@@ -32,7 +32,7 @@ repos:
       - id: check-builtin-literals
       - id: check-docstring-first
       - id: name-tests-test
-        args: ['--pytest-test-first']
+        args: ["--pytest-test-first"]
 
   # Python code formatting with Black
   - repo: https://github.com/psf/black
@@ -40,21 +40,24 @@ repos:
     hooks:
       - id: black
         language_version: python3
-        args: ['--line-length=88']
+        args: ["--line-length=88"]
+        files: ^(semantic_code_analyzer|tests|examples)/.*\.py$
 
   # Import sorting with isort
   - repo: https://github.com/pycqa/isort
     rev: 5.12.0
     hooks:
       - id: isort
-        args: ['--profile=black', '--line-length=88']
+        args: ["--profile=black", "--line-length=88"]
+        files: ^(semantic_code_analyzer|tests|examples)/.*\.py$
 
   # Linting with Ruff (replaces flake8, pycodestyle, pyflakes, etc.)
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.1.7
+    rev: v0.6.9
     hooks:
       - id: ruff
-        args: ['--fix', '--exit-non-zero-on-fix']
+        args: ["--fix", "--exit-non-zero-on-fix"]
+        files: ^(semantic_code_analyzer|tests|examples)/.*\.py$
 
   # Type checking with mypy
   - repo: https://github.com/pre-commit/mirrors-mypy
@@ -64,31 +67,32 @@ repos:
         additional_dependencies:
           - types-requests
           - types-PyYAML
-        args: ['--ignore-missing-imports', '--show-error-codes']
-        exclude: ^(tests/|examples/)
+        args: ["--ignore-missing-imports", "--show-error-codes"]
+        files: ^(semantic_code_analyzer|tests|examples)/.*\.py$
 
   # Security scanning with bandit
   - repo: https://github.com/pycqa/bandit
     rev: 1.7.5
     hooks:
       - id: bandit
-        args: ['-r', 'semantic_code_analyzer/', '-f', 'json', '-o', 'bandit-report.json']
-        exclude: ^tests/
+        additional_dependencies: [pbr]
+        args: ["--skip", "B101"]
+        files: ^(semantic_code_analyzer|examples|tests)/.*\.py$
 
   # Check for common security issues
   - repo: https://github.com/Yelp/detect-secrets
     rev: v1.4.0
     hooks:
       - id: detect-secrets
-        args: ['--baseline', '.secrets.baseline']
-        exclude: package.lock.json
+        args: ["--baseline", ".secrets.baseline"]
+        files: ^(semantic_code_analyzer|examples|tests)/.*\.(py|yaml|yml|json|txt|md)$
 
   # Documentation and docstring formatting
   - repo: https://github.com/pycqa/pydocstyle
     rev: 6.3.0
     hooks:
       - id: pydocstyle
-        args: ['--convention=google']
+        args: ["--convention=google"]
         exclude: ^(tests/|examples/)
 
   # Check requirements.txt files
@@ -103,14 +107,14 @@ repos:
     rev: v3.15.0
     hooks:
       - id: pyupgrade
-        args: ['--py39-plus']
+        args: ["--py39-plus"]
 
   # Check for dead code
   - repo: https://github.com/jendrikseipp/vulture
     rev: v2.10
     hooks:
       - id: vulture
-        args: ['semantic_code_analyzer/', '--min-confidence=80']
+        args: ["semantic_code_analyzer/", "--min-confidence=80"]
 
   # Format YAML files
   - repo: https://github.com/pre-commit/mirrors-prettier
@@ -124,7 +128,7 @@ repos:
     rev: v0.37.0
     hooks:
       - id: markdownlint
-        args: ['--fix']
+        args: ["--fix"]
 
   # Check shell scripts
   - repo: https://github.com/shellcheck-py/shellcheck-py
@@ -138,7 +142,7 @@ repos:
     hooks:
       - id: conventional-pre-commit
         stages: [commit-msg]
-        args: ['--strict']
+        args: ["--strict"]
 
   # License header check
   - repo: https://github.com/Lucas-C/pre-commit-hooks
@@ -150,7 +154,7 @@ repos:
           - --license-filepath
           - LICENSE
           - --comment-style
-          - '#'
+          - "#"
 
   # Local hooks for project-specific checks
   - repo: local
@@ -160,17 +164,21 @@ repos:
         name: pytest-check
         entry: pytest
         language: system
-        args: ['tests/', '--maxfail=1', '-x']
+        args: ["tests/", "--maxfail=1", "-x"]
         pass_filenames: false
         always_run: true
-        stages: [commit]
+        stages: [pre-commit]
 
       # Check that version numbers are consistent
       - id: version-consistency
         name: version-consistency
         entry: python
         language: system
-        args: ['-c', 'import semantic_code_analyzer; print(f"Version: {semantic_code_analyzer.__version__}")']
+        args:
+          [
+            "-c",
+            'import semantic_code_analyzer; print(f"Version: {semantic_code_analyzer.__version__}")',
+          ]
         pass_filenames: false
         always_run: true
 
@@ -179,7 +187,7 @@ repos:
         name: examples-syntax-check
         entry: python
         language: system
-        args: ['-m', 'py_compile']
+        args: ["-m", "py_compile"]
         files: ^examples/.*\.py$
 
       # Check that CLI is importable
@@ -187,13 +195,17 @@ repos:
         name: cli-import-check
         entry: python
         language: system
-        args: ['-c', 'from semantic_code_analyzer.cli import main; print("CLI import successful")']
+        args:
+          [
+            "-c",
+            'from semantic_code_analyzer.cli import cli; print("CLI import successful")',
+          ]
         pass_filenames: false
         always_run: true
 
 # Global configuration
 default_install_hook_types: [pre-commit, commit-msg]
-default_stages: [commit]
+default_stages: [pre-commit]
 
 # Exclude patterns
 exclude: |
@@ -214,7 +226,7 @@ exclude: |
   )$
 
 # Minimum version required
-minimum_pre_commit_version: '3.0.0'
+minimum_pre_commit_version: "3.0.0"
 
 # CI configuration
 ci:
@@ -223,8 +235,8 @@ ci:
 
     for more information, see https://pre-commit.ci
   autofix_prs: true
-  autoupdate_branch: ''
-  autoupdate_commit_msg: '[pre-commit.ci] pre-commit autoupdate'
+  autoupdate_branch: ""
+  autoupdate_commit_msg: "[pre-commit.ci] pre-commit autoupdate"
   autoupdate_schedule: weekly
-  skip: [pytest-check]  # Skip heavy tests in CI
+  skip: [pytest-check] # Skip heavy tests in CI
   submodules: false

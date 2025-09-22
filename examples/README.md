@@ -1,11 +1,15 @@
-# Semantic Code Analyzer - Examples
+# Multi-Dimensional Code Analyzer - Examples
 
-This directory contains comprehensive examples demonstrating how to use the Semantic Code Analyzer (SCA) for various use cases.
+This directory contains comprehensive examples demonstrating how to use the
+Multi-Dimensional Code Analyzer (SCA) for various use cases with domain-aware
+adherence analysis.
 
 ## 📁 Example Files
 
 ### `basic_usage.py`
+
 Demonstrates fundamental SCA operations:
+
 - Single commit analysis
 - Batch commit analysis
 - Commit comparison
@@ -14,13 +18,16 @@ Demonstrates fundamental SCA operations:
 - Scorer configuration
 
 **Run it:**
+
 ```bash
 cd examples
 python basic_usage.py
 ```
 
 ### `advanced_usage.py`
+
 Shows advanced features and integration patterns:
+
 - Custom configurations for different scenarios
 - Performance optimization techniques
 - Function-level analysis
@@ -29,6 +36,7 @@ Shows advanced features and integration patterns:
 - Cross-repository comparison
 
 **Run it:**
+
 ```bash
 cd examples
 python advanced_usage.py
@@ -37,37 +45,60 @@ python advanced_usage.py
 ## 🎯 Use Case Examples
 
 ### Basic Analysis
-```python
-from semantic_code_analyzer import SemanticScorer, ScorerConfig
 
-# Simple analysis
-scorer = SemanticScorer("/path/to/repo")
-result = scorer.score_commit_similarity("commit_hash")
-print(f"Similarity: {result.aggregate_scores['max_similarity']:.3f}")
+```python
+from semantic_code_analyzer import MultiDimensionalScorer, EnhancedScorerConfig
+
+# Multi-dimensional analysis with default configuration
+config = EnhancedScorerConfig()
+scorer = MultiDimensionalScorer(config, repo_path="/path/to/repo")
+results = scorer.analyze_commit("commit_hash")
+
+print(f"Overall Adherence: {results['overall_adherence']:.3f}")
+print(f"Domain Adherence: {results['dimensional_scores']['domain_adherence']:.3f}")
+
+# Basic analysis without AI features
+config = EnhancedScorerConfig(
+    enable_domain_adherence_analysis=False,
+    build_pattern_indices=False
+)
+scorer = MultiDimensionalScorer(config, repo_path="/path/to/repo")
+results = scorer.analyze_commit("commit_hash")
 ```
 
 ### Custom Configuration
+
 ```python
-# Optimized for large codebases
-config = ScorerConfig(
-    max_files=500,
-    use_mps=True,  # Apple M3 acceleration
-    cache_embeddings=True,
-    distance_metric="euclidean"
+# Domain-aware configuration with AI features
+config = EnhancedScorerConfig(
+    architectural_weight=0.20,
+    quality_weight=0.30,
+    typescript_weight=0.25,
+    framework_weight=0.15,
+    domain_adherence_weight=0.10,
+    similarity_threshold=0.4,
+    max_similar_patterns=15,
+    build_pattern_indices=True
 )
 
-scorer = SemanticScorer("/path/to/repo", config)
+scorer = MultiDimensionalScorer(config, repo_path="/path/to/repo")
 ```
 
 ### Batch Analysis
+
 ```python
 # Analyze multiple commits
-results = scorer.get_recent_commits_analysis(max_commits=10)
-for result in results:
-    print(f"{result.commit_info.hash}: {result.aggregate_scores['max_similarity']:.3f}")
+commit_hashes = ["abc123", "def456", "789ghi"]
+for commit_hash in commit_hashes:
+    results = scorer.analyze_commit(commit_hash)
+    print(f"{commit_hash}: {results['overall_adherence']:.3f}")
+    print(f"  - Architectural: {results['dimensional_scores']['architectural']:.3f}")
+    print(f"  - Quality: {results['dimensional_scores']['quality']:.3f}")
+    print(f"  - Domain Adherence: {results['dimensional_scores']['domain_adherence']:.3f}")
 ```
 
 ### Performance Optimization
+
 ```python
 # Fast analysis configuration
 fast_config = ScorerConfig(
@@ -81,20 +112,33 @@ fast_config = ScorerConfig(
 ## 📊 CLI Examples
 
 ### Single Commit Analysis
-```bash
-# Basic analysis
-sca-analyze abc123def456
 
-# Detailed analysis with custom options
-sca-analyze abc123def456 \
-  --repo-path /path/to/repo \
-  --language python \
-  --distance-metric euclidean \
-  --detailed \
+```bash
+# Basic multi-dimensional analysis
+sca-analyze analyze HEAD
+
+# With custom weights
+sca-analyze analyze abc123def456 \
+  --architectural-weight 0.25 \
+  --quality-weight 0.30 \
+  --framework-weight 0.15 \
+  --domain-adherence-weight 0.15 \
   --output results.json
+
+# Enable AI-enhanced domain adherence
+sca-analyze analyze abc123def456 \
+  --domain-adherence-weight 0.25 \
+  --similarity-threshold 0.4 \
+  --max-similar-patterns 15
+
+# Disable AI features for speed
+sca-analyze analyze abc123def456 \
+  --disable-domain-adherence \
+  --disable-pattern-indices
 ```
 
-### Batch Analysis
+### Multi-Commit Analysis
+
 ```bash
 # Analyze last 10 commits
 sca-analyze batch --count 10
@@ -104,12 +148,14 @@ sca-analyze batch --branch develop --count 5 --output batch_results.json
 ```
 
 ### Commit Comparison
+
 ```bash
 # Compare two commits
 sca-analyze compare abc123 def456 --output comparison.json
 ```
 
 ### Repository Information
+
 ```bash
 # Get repo and configuration info
 sca-analyze info
@@ -120,6 +166,7 @@ sca-analyze info
 ### For Different Scenarios
 
 #### Large Codebase Analysis
+
 ```python
 large_codebase_config = ScorerConfig(
     max_files=500,
@@ -131,6 +178,7 @@ large_codebase_config = ScorerConfig(
 ```
 
 #### Detailed Code Review
+
 ```python
 detailed_config = ScorerConfig(
     max_files=50,
@@ -141,6 +189,7 @@ detailed_config = ScorerConfig(
 ```
 
 #### CI/CD Integration
+
 ```python
 ci_config = ScorerConfig(
     max_files=100,
@@ -151,6 +200,7 @@ ci_config = ScorerConfig(
 ```
 
 #### Performance Benchmarking
+
 ```python
 benchmark_config = ScorerConfig(
     cache_embeddings=False,  # Fresh calculations
@@ -163,6 +213,7 @@ benchmark_config = ScorerConfig(
 ## 🎨 Output Interpretation
 
 ### Similarity Scores
+
 | Score | Interpretation |
 |-------|---------------|
 | 0.8-1.0 | Very High - Follows existing patterns closely |
@@ -172,6 +223,7 @@ benchmark_config = ScorerConfig(
 | 0.0-0.2 | Very Low - Significantly different approach |
 
 ### Example Output
+
 ```json
 {
   "commit_info": {
@@ -203,6 +255,7 @@ benchmark_config = ScorerConfig(
 ## 🔄 Integration Patterns
 
 ### Git Hooks
+
 ```bash
 #!/bin/bash
 # pre-commit hook
@@ -214,6 +267,7 @@ fi
 ```
 
 ### CI/CD Pipeline
+
 ```yaml
 # GitHub Actions example
 - name: Semantic Code Analysis
@@ -229,6 +283,7 @@ fi
 ```
 
 ### Python Integration
+
 ```python
 def check_commit_quality(commit_hash: str, threshold: float = 0.3):
     """Check if commit meets quality standards."""
@@ -246,6 +301,7 @@ def check_commit_quality(commit_hash: str, threshold: float = 0.3):
 ## 🚀 Performance Tips
 
 ### Optimization Strategies
+
 1. **Enable Caching**: Set `cache_embeddings=True` for repeated analyses
 2. **Limit File Count**: Use `max_files` for large repositories
 3. **Use MPS**: Enable `use_mps=True` on Apple Silicon
@@ -253,6 +309,7 @@ def check_commit_quality(commit_hash: str, threshold: float = 0.3):
 5. **Batch Processing**: Analyze multiple commits together
 
 ### Memory Management
+
 ```python
 # For large repositories
 config = ScorerConfig(
@@ -270,26 +327,31 @@ scorer.clear_caches()
 ### Common Issues
 
 #### "No commits found"
+
 - Ensure you're in a Git repository
 - Check that the repository has commits
 - Verify the commit hash exists
 
 #### "Model loading failed"
+
 - Check internet connection for model download
 - Verify sufficient disk space
 - Ensure compatible PyTorch version
 
 #### "Out of memory"
+
 - Reduce `max_files` parameter
 - Enable `cache_embeddings=False` temporarily
 - Use smaller batch sizes
 
 #### "MPS not available"
+
 - Verify you're on Apple Silicon
 - Check PyTorch MPS support: `torch.backends.mps.is_available()`
 - Fall back to CPU: `use_mps=False`
 
 ### Debug Mode
+
 ```python
 import logging
 logging.basicConfig(level=logging.DEBUG)
@@ -303,7 +365,8 @@ config = ScorerConfig(detailed_output=True)
 - [Main README](../README.md) - Project overview and installation
 - [API Documentation](../semantic_code_analyzer/) - Detailed API reference
 - [Test Suite](../tests/) - Comprehensive tests and examples
-- [Configuration Guide](../semantic_code_analyzer/README.md) - Advanced configuration options
+- [Configuration Guide](../semantic_code_analyzer/README.md) - Advanced
+  configuration options
 
 ## 🤝 Contributing Examples
 
@@ -317,4 +380,4 @@ Found a useful pattern or use case? Contribute additional examples:
 
 ---
 
-**Happy analyzing! 🚀**
+## Happy analyzing! 🚀

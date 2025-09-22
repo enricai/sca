@@ -20,9 +20,30 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
-"""
-Test suite for Semantic Code Analyzer.
+"""Multi-dimensional code analysis modules.
 
-This package contains comprehensive tests for all components of the semantic
-code analyzer, including unit tests, integration tests, and performance tests.
+This package provides specialized analyzers for different aspects of code quality
+and adherence to patterns, best practices, and framework conventions.
 """
+
+from .architectural_analyzer import ArchitecturalAnalyzer
+from .base_analyzer import AnalysisResult, BaseAnalyzer, PatternMatch, Recommendation
+from .domain_adherence_analyzer import DomainAwareAdherenceAnalyzer
+from .domain_classifier import ArchitecturalDomain, DomainClassifier
+from .framework_analyzer import FrameworkAnalyzer
+from .quality_analyzer import QualityAnalyzer
+from .typescript_analyzer import TypeScriptAnalyzer
+
+__all__ = [
+    "BaseAnalyzer",
+    "AnalysisResult",
+    "PatternMatch",
+    "Recommendation",
+    "ArchitecturalAnalyzer",
+    "QualityAnalyzer",
+    "FrameworkAnalyzer",
+    "TypeScriptAnalyzer",
+    "DomainAwareAdherenceAnalyzer",
+    "DomainClassifier",
+    "ArchitecturalDomain",
+]

@@ -20,9 +20,14 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
-"""
-Test suite for Semantic Code Analyzer.
+"""Code embeddings and similarity search for pattern-based analysis.
 
-This package contains comprehensive tests for all components of the semantic
-code analyzer, including unit tests, integration tests, and performance tests.
+This package provides GraphCodeBERT-based code embeddings and FAISS-powered
+similarity search for identifying similar code patterns within domain contexts.
 """
+
+from __future__ import annotations
+
+from .pattern_indexer import PatternIndexer, SimilarityMatch
+
+__all__ = ["PatternIndexer", "SimilarityMatch"]

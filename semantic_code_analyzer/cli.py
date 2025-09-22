@@ -1,580 +1,463 @@
-"""
-Command-line interface for the Semantic Code Analyzer.
+# MIT License
+#
+# Copyright (c) 2024 Semantic Code Analyzer Contributors
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
 
-Provides easy-to-use CLI commands for analyzing semantic similarity of Git commits
-with rich output formatting and progress tracking.
+"""CLI for multi-dimensional code analysis.
+
+This module provides a command-line interface for comprehensive code quality
+analysis through multi-dimensional pattern recognition.
 """
 
-import click
+from __future__ import annotations
+
+import json
 import logging
 import sys
-from pathlib import Path
-from typing import List, Optional
-import json
 import time
+from typing import Any
+
+import click
 from rich.console import Console
-from rich.table import Table
-from rich.progress import Progress, SpinnerColumn, TextColumn, BarColumn, TimeElapsedColumn
 from rich.panel import Panel
-from rich.text import Text
-from rich.tree import Tree
-from rich import print as rprint
+from rich.progress import track
+from rich.table import Table
 
-from .semantic_scorer import SemanticScorer, ScorerConfig
-from .similarity_calculator import DistanceMetric
+from .scorers import EnhancedScorerConfig, MultiDimensionalScorer
 
-# Initialize Rich console
 console = Console()
-
-# Configure logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    handlers=[
-        logging.StreamHandler(sys.stdout)
-    ]
-)
-
 logger = logging.getLogger(__name__)
 
 
-def setup_logging(verbose: bool, quiet: bool):
-    """Setup logging configuration based on verbosity flags."""
-    import warnings
-
-    if quiet:
-        logging.getLogger().setLevel(logging.ERROR)
-        # Suppress all warnings in quiet mode
-        warnings.filterwarnings("ignore")
-    elif verbose:
-        logging.getLogger().setLevel(logging.DEBUG)
-    else:
-        logging.getLogger().setLevel(logging.WARNING)  # Clean default - only warnings and errors
-        # Suppress common PyTorch warnings that users can't act on
-        warnings.filterwarnings("ignore", message=".*record_context_cpp.*")
-        warnings.filterwarnings("ignore", message=".*torch._dynamo.*")
-        warnings.filterwarnings("ignore", category=UserWarning, module="torch.*")
-
-
 @click.group()
-@click.version_option(version="0.1.0", package_name="semantic-code-analyzer")
-@click.option('--verbose', '-v', is_flag=True, help='Enable verbose output')
-@click.option('--quiet', '-q', is_flag=True, help='Enable quiet mode (errors only)')
+@click.option("--verbose", "-v", is_flag=True, help="Enable verbose logging")
+@click.option("--debug", is_flag=True, help="Enable debug logging")
 @click.pass_context
-def cli(ctx, verbose: bool, quiet: bool):
-    """
-    Semantic Code Analyzer - Analyze semantic similarity of Git commits.
+def cli(ctx: click.Context, verbose: bool, debug: bool) -> None:
+    """Multi-Dimensional Code Analyzer for comprehensive code quality analysis."""
+    # Set up logging
+    level = logging.DEBUG if debug else (logging.INFO if verbose else logging.WARNING)
+    logging.basicConfig(
+        level=level, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+    )
 
-    A tool for analyzing how semantically similar a Git commit is to the existing
-    codebase using state-of-the-art code embeddings and optimized for Apple M3 hardware.
-    """
+    # Ensure context object exists
     ctx.ensure_object(dict)
-    ctx.obj['verbose'] = verbose
-    ctx.obj['quiet'] = quiet
-    setup_logging(verbose, quiet)
+    ctx.obj["verbose"] = verbose
+    ctx.obj["debug"] = debug
 
 
 @cli.command()
-@click.argument('commit_hash')
-@click.option('--repo-path', '-r', default='.',
-              help='Path to Git repository (default: current directory)')
-@click.option('--language', '-l', default='python',
-              type=click.Choice(['python', 'javascript', 'typescript', 'java', 'cpp', 'c', 'go']),
-              help='Programming language of the code')
-@click.option('--model', '-m', default='microsoft/graphcodebert-base',
-              help='Model to use for code embeddings')
-@click.option('--distance-metric', '-d', default='euclidean',
-              type=click.Choice(['euclidean', 'cosine', 'manhattan', 'chebyshev']),
-              help='Distance metric for similarity calculation')
-@click.option('--max-files', type=int, help='Maximum number of files to analyze')
-@click.option('--output', '-o', type=click.Path(), help='Save results to JSON file')
-@click.option('--detailed', is_flag=True, help='Show detailed per-file analysis')
-@click.option('--no-cache', is_flag=True, help='Disable embedding caching')
-@click.option('--compare-current', is_flag=True, help='Compare against current filesystem instead of parent commit')
+@click.argument("commit_hash")
+@click.option(
+    "--repo-path",
+    "-r",
+    default=".",
+    help="Path to repository (default: current directory)",
+)
+@click.option("--output", "-o", help="Output file for results (JSON format)")
+@click.option(
+    "--architectural-weight",
+    default=0.25,
+    type=float,
+    help="Weight for architectural patterns",
+)
+@click.option(
+    "--quality-weight", default=0.25, type=float, help="Weight for code quality"
+)
+@click.option(
+    "--framework-weight", default=0.20, type=float, help="Weight for framework patterns"
+)
+@click.option(
+    "--disable-architectural", is_flag=True, help="Disable architectural analysis"
+)
+@click.option("--disable-quality", is_flag=True, help="Disable quality analysis")
+@click.option("--disable-typescript", is_flag=True, help="Disable TypeScript analysis")
+@click.option("--disable-framework", is_flag=True, help="Disable framework analysis")
+@click.option(
+    "--disable-domain-adherence",
+    is_flag=True,
+    help="Disable domain-aware adherence analysis",
+)
+@click.option(
+    "--domain-adherence-weight",
+    default=0.15,
+    type=float,
+    help="Weight for domain adherence analysis",
+)
+@click.option(
+    "--similarity-threshold",
+    default=0.3,
+    type=float,
+    help="Minimum similarity threshold for pattern matching",
+)
+@click.option(
+    "--max-similar-patterns",
+    default=10,
+    type=int,
+    help="Maximum number of similar patterns to consider",
+)
+@click.option(
+    "--disable-pattern-indices",
+    is_flag=True,
+    help="Disable automatic pattern index building",
+)
+@click.option(
+    "--max-recommendations",
+    default=10,
+    type=int,
+    help="Maximum recommendations per file",
+)
 @click.pass_context
-def analyze(ctx, commit_hash: str, repo_path: str, language: str, model: str,
-           distance_metric: str, max_files: Optional[int], output: Optional[str],
-           detailed: bool, no_cache: bool, compare_current: bool):
-    """
-    Analyze semantic similarity of a specific commit against the codebase.
+def analyze(
+    ctx: click.Context,
+    commit_hash: str,
+    repo_path: str,
+    output: str | None,
+    architectural_weight: float,
+    quality_weight: float,
+    framework_weight: float,
+    domain_adherence_weight: float,
+    similarity_threshold: float,
+    max_similar_patterns: int,
+    disable_architectural: bool,
+    disable_quality: bool,
+    disable_typescript: bool,
+    disable_framework: bool,
+    disable_domain_adherence: bool,
+    disable_pattern_indices: bool,
+    max_recommendations: int,
+) -> None:
+    """Perform multi-dimensional analysis on a commit."""
+    console.print(f"[bold blue]Analyzing commit: {commit_hash}[/bold blue]")
 
-    COMMIT_HASH: The Git commit hash to analyze
-    """
-    try:
-        # Create configuration
-        config = ScorerConfig(
-            model_name=model,
-            distance_metric=distance_metric,
-            max_files=max_files,
-            detailed_output=detailed,
-            cache_embeddings=not no_cache,
-            save_results=bool(output),
-            compare_against_parent=not compare_current  # Default True, False if --compare-current
+    # Calculate TypeScript weight as remainder
+    typescript_weight = 1.0 - (
+        architectural_weight
+        + quality_weight
+        + framework_weight
+        + domain_adherence_weight
+    )
+
+    # Validate all weights are positive and sum to 1.0
+    if typescript_weight < 0:
+        console.print(
+            "[red]Error: Weights sum to more than 1.0. Reduce other weights.[/red]"
+        )
+        console.print(f"   Architectural: {architectural_weight}")
+        console.print(f"   Quality: {quality_weight}")
+        console.print(f"   Framework: {framework_weight}")
+        console.print(f"   Domain Adherence: {domain_adherence_weight}")
+        console.print(
+            f"   Would leave {typescript_weight:.3f} for TypeScript (must be positive)"
+        )
+        sys.exit(1)
+
+    if typescript_weight < 0.05:
+        console.print(
+            f"[yellow]Warning: TypeScript weight very low ({typescript_weight:.3f})[/yellow]"
         )
 
-        # Display analysis start
-        console.print(Panel.fit(
-            f"[bold blue]Semantic Code Analysis[/bold blue]\n"
-            f"Repository: {repo_path}\n"
-            f"Commit: {commit_hash}\n"
-            f"Language: {language}\n"
-            f"Model: {model}",
-            title="Starting Analysis"
-        ))
+    # Create configuration
+    config = EnhancedScorerConfig(
+        architectural_weight=architectural_weight,
+        quality_weight=quality_weight,
+        framework_weight=framework_weight,
+        typescript_weight=typescript_weight,
+        domain_adherence_weight=domain_adherence_weight,
+        enable_architectural_analysis=not disable_architectural,
+        enable_quality_analysis=not disable_quality,
+        enable_typescript_analysis=not disable_typescript,
+        enable_framework_analysis=not disable_framework,
+        enable_domain_adherence_analysis=not disable_domain_adherence,
+        similarity_threshold=similarity_threshold,
+        max_similar_patterns=max_similar_patterns,
+        build_pattern_indices=not disable_pattern_indices,
+        max_recommendations_per_file=max_recommendations,
+        include_actionable_feedback=True,
+        include_pattern_details=ctx.obj["verbose"],
+    )
 
-        # Initialize scorer with progress indication
-        with Progress(
-            SpinnerColumn(),
-            TextColumn("[progress.description]{task.description}"),
-            transient=True,
-            console=console
-        ) as progress:
+    try:
+        # Initialize scorer
+        with console.status("[bold green]Initializing analyzers..."):
+            scorer = MultiDimensionalScorer(config, repo_path)
 
-            init_task = progress.add_task(f"Loading {model} model and initializing...", total=None)
-            scorer = SemanticScorer(repo_path, config)
-            progress.update(init_task, completed=True)
+        # Perform analysis
+        console.print("[bold green]Running multi-dimensional analysis...[/bold green]")
+        start_time = time.time()
 
-            # Perform analysis
-            analysis_task = progress.add_task(f"Analyzing commit {commit_hash[:8]} similarity...", total=None)
-            result = scorer.score_commit_similarity(commit_hash, language)
-            progress.update(analysis_task, completed=True)
+        results = scorer.analyze_commit(commit_hash)
+
+        analysis_time = time.time() - start_time
+        console.print(f"[green]Analysis completed in {analysis_time:.2f}s[/green]")
 
         # Display results
-        _display_analysis_results(result, detailed)
+        _display_results(results, ctx.obj["verbose"])
 
         # Save results if requested
         if output:
-            _save_results_to_file(result, output)
+            _save_results(results, output, scorer)
             console.print(f"[green]Results saved to {output}[/green]")
 
     except Exception as e:
-        console.print(f"[bold red]Error:[/bold red] {e}")
-        if ctx.obj.get('verbose'):
+        console.print(f"[red]Error during analysis: {e}[/red]")
+        if ctx.obj["debug"]:
             console.print_exception()
         sys.exit(1)
 
 
 @cli.command()
-@click.option('--repo-path', '-r', default='.',
-              help='Path to Git repository (default: current directory)')
-@click.option('--count', '-c', default=10, type=int,
-              help='Number of recent commits to analyze')
-@click.option('--branch', '-b', default='HEAD',
-              help='Branch to analyze commits from')
-@click.option('--language', '-l', default='python',
-              type=click.Choice(['python', 'javascript', 'typescript', 'java', 'cpp', 'c', 'go']),
-              help='Programming language of the code')
-@click.option('--model', '-m', default='microsoft/graphcodebert-base',
-              help='Model to use for code embeddings')
-@click.option('--output', '-o', type=click.Path(), help='Save results to JSON file')
+@click.option(
+    "--base-commit", required=True, help="Base commit hash (your implementation)"
+)
+@click.option(
+    "--compare-commits",
+    required=True,
+    help="Comma-separated list of commits to compare",
+)
+@click.option("--repo-path", "-r", default=".", help="Path to repository")
+@click.option("--output", "-o", help="Output file for comparison results")
 @click.pass_context
-def batch(ctx, repo_path: str, count: int, branch: str, language: str,
-         model: str, output: Optional[str]):
-    """
-    Analyze semantic similarity for multiple recent commits.
-    """
+def compare(
+    ctx: click.Context,
+    base_commit: str,
+    compare_commits: str,
+    repo_path: str,
+    output: str | None,
+) -> None:
+    """Compare multiple commits against a base implementation."""
+    commits_to_compare = [c.strip() for c in compare_commits.split(",")]
+
+    console.print(
+        f"[bold blue]Comparing {len(commits_to_compare)} commits against base: {base_commit}[/bold blue]"
+    )
+
+    # Default configuration for comparison
+    config = EnhancedScorerConfig()
+    scorer = MultiDimensionalScorer(config, repo_path)
+
+    # Analyze all commits
+    all_results = {}
+
+    # Analyze base commit
+    console.print(f"[green]Analyzing base commit: {base_commit}[/green]")
     try:
-        config = ScorerConfig(
-            model_name=model,
-            save_results=bool(output)
+        all_results["base"] = scorer.analyze_commit(base_commit)
+    except Exception as e:
+        console.print(f"[red]Error analyzing base commit: {e}[/red]")
+        sys.exit(1)
+
+    # Analyze comparison commits
+    for commit in track(commits_to_compare, description="Analyzing commits..."):
+        try:
+            all_results[commit] = scorer.analyze_commit(commit)
+        except Exception as e:
+            console.print(f"[yellow]Warning: Failed to analyze {commit}: {e}[/yellow]")
+
+    # Display comparison
+    _display_comparison(all_results, base_commit)
+
+    # Save comparison results
+    if output:
+        with open(output, "w") as f:
+            json.dump(all_results, f, indent=2, default=str)
+        console.print(f"[green]Comparison results saved to {output}[/green]")
+
+
+def _display_results(results: dict[str, Any], verbose: bool = False) -> None:
+    """Display analysis results in a formatted way."""
+    # Overall score panel
+    overall_score = results.get("overall_adherence", 0)
+    score_color = _get_score_color(overall_score)
+
+    console.print(
+        Panel(
+            f"[{score_color}]Overall Adherence: {overall_score:.3f}[/{score_color}]",
+            title="Analysis Results",
+            border_style=score_color,
+        )
+    )
+
+    # Dimensional scores table
+    dimensional_scores = results.get("dimensional_scores", {})
+    if dimensional_scores:
+        table = Table(title="Dimensional Scores")
+        table.add_column("Dimension", style="cyan")
+        table.add_column("Score", justify="right")
+        table.add_column("Interpretation", style="dim")
+
+        for dimension, score in dimensional_scores.items():
+            score_color = _get_score_color(score)
+            interpretation = _get_score_interpretation(score)
+            table.add_row(
+                dimension.title(),
+                f"[{score_color}]{score:.3f}[/{score_color}]",
+                interpretation,
+            )
+
+        console.print(table)
+
+    # Pattern analysis summary
+    pattern_analysis = results.get("pattern_analysis", {})
+    if pattern_analysis:
+        console.print("\n[bold]Pattern Analysis:[/bold]")
+        console.print(
+            f"  Total patterns found: {pattern_analysis.get('total_patterns_found', 0)}"
+        )
+        console.print(
+            f"  Average confidence: {pattern_analysis.get('pattern_confidence_avg', 0):.3f}"
         )
 
-        console.print(Panel.fit(
-            f"[bold blue]Batch Semantic Analysis[/bold blue]\n"
-            f"Repository: {repo_path}\n"
-            f"Branch: {branch}\n"
-            f"Count: {count} commits\n"
-            f"Language: {language}",
-            title="Starting Batch Analysis"
-        ))
+        patterns_by_type = pattern_analysis.get("patterns_by_type", {})
+        if patterns_by_type:
+            console.print("  Patterns by type:")
+            for pattern_type, count in patterns_by_type.items():
+                console.print(f"    {pattern_type}: {count}")
 
-        # Initialize scorer
-        with console.status(f"[bold green]Loading {model} model..."):
-            scorer = SemanticScorer(repo_path, config)
+    # Actionable feedback
+    feedback = results.get("actionable_feedback", [])
+    if feedback:
+        console.print("\n[bold red]Top Recommendations:[/bold red]")
+        for i, rec in enumerate(feedback[:5], 1):  # Show top 5
+            severity_color = _get_severity_color(rec["severity"])
+            console.print(
+                f"  {i}. [{severity_color}]{rec['severity'].upper()}[/{severity_color}]: {rec['message']}"
+            )
+            if rec.get("suggested_fix"):
+                console.print(f"     [dim]Fix: {rec['suggested_fix']}[/dim]")
 
-        # Analyze recent commits
-        with Progress(
-            SpinnerColumn(),
-            TextColumn("[progress.description]{task.description}"),
-            BarColumn(),
-            TextColumn("[progress.percentage]{task.percentage:>3.0f}%"),
-            TimeElapsedColumn(),
-            console=console
-        ) as progress:
-
-            task = progress.add_task("Analyzing commits...", total=count)
-            results = scorer.get_recent_commits_analysis(count, branch, language)
-
-            for i, _ in enumerate(results):
-                progress.update(task, advance=1)
-
-        # Display batch results
-        _display_batch_results(results)
-
-        # Save results if requested
-        if output:
-            _save_batch_results_to_file(results, output)
-            console.print(f"[green]Results saved to {output}[/green]")
-
-    except Exception as e:
-        console.print(f"[bold red]Error:[/bold red] {e}")
-        if ctx.obj.get('verbose'):
-            console.print_exception()
-        sys.exit(1)
+    # File-level analysis if verbose
+    if verbose:
+        file_analysis = results.get("file_level_analysis", {})
+        if file_analysis:
+            console.print("\n[bold]File-Level Analysis:[/bold]")
+            for file_path, file_data in list(file_analysis.items())[
+                :3
+            ]:  # Show top 3 files
+                console.print(f"  {file_path}:")
+                scores = file_data.get("scores", {})
+                for analyzer, score in scores.items():
+                    score_color = _get_score_color(score)
+                    console.print(
+                        f"    {analyzer}: [{score_color}]{score:.3f}[/{score_color}]"
+                    )
 
 
-@cli.command()
-@click.argument('commit_a')
-@click.argument('commit_b')
-@click.option('--repo-path', '-r', default='.',
-              help='Path to Git repository (default: current directory)')
-@click.option('--language', '-l', default='python',
-              type=click.Choice(['python', 'javascript', 'typescript', 'java', 'cpp', 'c', 'go']),
-              help='Programming language of the code')
-@click.option('--output', '-o', type=click.Path(), help='Save results to JSON file')
-@click.pass_context
-def compare(ctx, commit_a: str, commit_b: str, repo_path: str,
-           language: str, output: Optional[str]):
-    """
-    Compare semantic similarity between two commits.
-
-    COMMIT_A: First commit hash
-    COMMIT_B: Second commit hash
-    """
-    try:
-        config = ScorerConfig(save_results=bool(output))
-
-        console.print(Panel.fit(
-            f"[bold blue]Commit Comparison[/bold blue]\n"
-            f"Repository: {repo_path}\n"
-            f"Commit A: {commit_a}\n"
-            f"Commit B: {commit_b}\n"
-            f"Language: {language}",
-            title="Starting Comparison"
-        ))
-
-        # Initialize scorer
-        with console.status("[bold green]Loading model and initializing..."):
-            scorer = SemanticScorer(repo_path, config)
-
-        # Compare commits
-        with console.status(f"[bold green]Comparing commits {commit_a[:8]} vs {commit_b[:8]}..."):
-            comparison_result = scorer.compare_commits(commit_a, commit_b, language)
-
-        # Display comparison results
-        _display_comparison_results(comparison_result)
-
-        # Save results if requested
-        if output:
-            _save_results_to_file(comparison_result, output)
-            console.print(f"[green]Results saved to {output}[/green]")
-
-    except Exception as e:
-        console.print(f"[bold red]Error:[/bold red] {e}")
-        if ctx.obj.get('verbose'):
-            console.print_exception()
-        sys.exit(1)
-
-
-@cli.command()
-@click.option('--repo-path', '-r', default='.',
-              help='Path to Git repository (default: current directory)')
-def info(repo_path: str):
-    """
-    Display information about the repository and scorer configuration.
-    """
-    try:
-        config = ScorerConfig()
-
-        with console.status("[bold green]Gathering information..."):
-            scorer = SemanticScorer(repo_path, config)
-            info_data = scorer.get_scorer_info()
-
-        # Display information
-        _display_info(info_data)
-
-    except Exception as e:
-        console.print(f"[bold red]Error:[/bold red] {e}")
-        sys.exit(1)
-
-
-def _display_analysis_results(result, detailed: bool = False):
-    """Display analysis results in a formatted table."""
-    # Main results table
-    table = Table(title="Similarity Analysis Results")
-    table.add_column("Metric", style="cyan", no_wrap=True)
-    table.add_column("Score", style="magenta")
-    table.add_column("Interpretation", style="green")
-
-    # Add main scores
-    max_sim = result.aggregate_scores.get('max_similarity', 0)
-    mean_sim = result.aggregate_scores.get('mean_similarity', 0)
-
-    table.add_row("Max Similarity", f"{max_sim:.3f}", _interpret_score(max_sim))
-    table.add_row("Mean Similarity", f"{mean_sim:.3f}", _interpret_score(mean_sim))
-    table.add_row("Processing Time", f"{result.processing_time:.2f}s", "")
-    table.add_row("Files Analyzed", str(len(result.file_results)), "")
-
-    console.print(table)
-
-    # Processing summary
-    model_info = result.model_info
-    processing_rate = len(result.file_results) / result.processing_time if result.processing_time > 0 else 0
-    console.print(Panel(
-        f"[bold]Processing Summary[/bold]\n"
-        f"Device: {model_info.get('device', 'unknown')}\n"
-        f"Model: {model_info.get('model_name', 'unknown')}\n"
-        f"Processing Rate: {processing_rate:.1f} files/second\n"
-        f"MPS Acceleration: {'✅ Active' if model_info.get('device') == 'mps' else '❌ Not used'}\n"
-        f"Cache Size: {model_info.get('cache_size', 0)} embeddings",
-        title="Performance"
-    ))
-
-    # Commit information
-    commit_info = result.commit_info
-    console.print(Panel(
-        f"[bold]Commit Information[/bold]\n"
-        f"Hash: {commit_info.hash}\n"
-        f"Author: {commit_info.author}\n"
-        f"Message: {commit_info.message[:100]}...\n"
-        f"Files Changed: {len(commit_info.files_changed)}\n"
-        f"Insertions: +{commit_info.insertions}\n"
-        f"Deletions: -{commit_info.deletions}",
-        title="Commit Details"
-    ))
-
-    # Detailed file results
-    if detailed and result.file_results:
-        _display_detailed_file_results(result.file_results)
-
-
-def _display_detailed_file_results(file_results):
-    """Display detailed per-file analysis results."""
-    for file_path, file_result in file_results.items():
-        overall_sim = file_result['overall_similarity']
-        similar_files = file_result['most_similar_files']
-
-        # File similarity table
-        file_table = Table(title=f"Analysis for {file_path}")
-        file_table.add_column("Metric", style="cyan")
-        file_table.add_column("Value", style="magenta")
-
-        file_table.add_row("Max Similarity", f"{overall_sim['max_similarity']:.3f}")
-        file_table.add_row("Mean Similarity", f"{overall_sim['mean_similarity']:.3f}")
-        file_table.add_row("Std Similarity", f"{overall_sim['std_similarity']:.3f}")
-
-        console.print(file_table)
-
-        # Most similar files
-        if similar_files:
-            similar_table = Table(title="Most Similar Files")
-            similar_table.add_column("Rank", style="yellow")
-            similar_table.add_column("File", style="blue")
-            similar_table.add_column("Similarity", style="green")
-
-            for sim_file in similar_files[:5]:  # Top 5
-                similar_table.add_row(
-                    str(sim_file['rank']),
-                    sim_file['file_path'],
-                    f"{sim_file['similarity_score']:.3f}"
-                )
-
-            console.print(similar_table)
-        console.print()
-
-
-def _display_batch_results(results):
-    """Display batch analysis results."""
-    if not results:
-        console.print("[yellow]No results to display[/yellow]")
-        return
-
-    # Summary table
-    table = Table(title="Batch Analysis Results")
-    table.add_column("Commit", style="cyan", no_wrap=True)
-    table.add_column("Files", style="blue")
-    table.add_column("Max Similarity", style="green")
-    table.add_column("Mean Similarity", style="yellow")
-    table.add_column("Author", style="magenta")
-
-    for result in results:
-        commit_info = result.commit_info
-        aggregate = result.aggregate_scores
-
-        table.add_row(
-            commit_info.hash,
-            str(len(result.file_results)),
-            f"{aggregate.get('max_similarity', 0):.3f}",
-            f"{aggregate.get('mean_similarity', 0):.3f}",
-            commit_info.author[:20]
-        )
-
-    console.print(table)
-
-    # Statistics
-    max_similarities = [r.aggregate_scores.get('max_similarity', 0) for r in results]
-    if max_similarities:
-        avg_similarity = sum(max_similarities) / len(max_similarities)
-        max_overall = max(max_similarities)
-        min_overall = min(max_similarities)
-
-        console.print(Panel(
-            f"[bold]Batch Statistics[/bold]\n"
-            f"Total Commits: {len(results)}\n"
-            f"Average Max Similarity: {avg_similarity:.3f}\n"
-            f"Highest Similarity: {max_overall:.3f}\n"
-            f"Lowest Similarity: {min_overall:.3f}",
-            title="Summary"
-        ))
-
-
-def _display_comparison_results(comparison_result):
-    """Display commit comparison results."""
-    result_a = comparison_result['commit_a']
-    result_b = comparison_result['commit_b']
-    similarity_diff = comparison_result['similarity_difference']
-
+def _display_comparison(
+    all_results: dict[str, dict[str, Any]], base_commit: str
+) -> None:
+    """Display comparison results between multiple commits."""
     # Comparison table
     table = Table(title="Commit Comparison")
-    table.add_column("Metric", style="cyan")
-    table.add_column("Commit A", style="blue")
-    table.add_column("Commit B", style="green")
-    table.add_column("Difference", style="yellow")
+    table.add_column("Commit", style="cyan")
+    table.add_column("Overall Score", justify="right")
+    table.add_column("Architectural", justify="right")
+    table.add_column("Quality", justify="right")
+    table.add_column("TypeScript", justify="right")
+    table.add_column("Framework", justify="right")
+    table.add_column("Domain Adherence", justify="right")
 
-    max_sim_a = result_a.aggregate_scores.get('max_similarity', 0)
-    max_sim_b = result_b.aggregate_scores.get('max_similarity', 0)
-    mean_sim_a = result_a.aggregate_scores.get('mean_similarity', 0)
-    mean_sim_b = result_b.aggregate_scores.get('mean_similarity', 0)
+    # Add base commit first
+    if base_commit in all_results:
+        base_result = all_results[base_commit]
+        _add_comparison_row(table, "BASE", base_result, is_base=True)
 
-    table.add_row(
-        "Max Similarity",
-        f"{max_sim_a:.3f}",
-        f"{max_sim_b:.3f}",
-        f"{similarity_diff['max_similarity_diff']:+.3f}"
-    )
-    table.add_row(
-        "Mean Similarity",
-        f"{mean_sim_a:.3f}",
-        f"{mean_sim_b:.3f}",
-        f"{similarity_diff['mean_similarity_diff']:+.3f}"
-    )
+    # Add other commits
+    for commit_hash, result in all_results.items():
+        if commit_hash != "base" and commit_hash != base_commit:
+            _add_comparison_row(table, commit_hash[:8], result)
 
     console.print(table)
 
-    # Cross-similarity info
-    cross_sim = comparison_result['cross_similarity']
-    console.print(Panel(
-        f"[bold]Cross-Similarity Analysis[/bold]\n"
-        f"Matrix Shape: {cross_sim['shape']}\n"
-        f"Max Cross-Similarity: {cross_sim['max_similarity']:.3f}\n"
-        f"Mean Cross-Similarity: {cross_sim['mean_similarity']:.3f}",
-        title="Direct Comparison"
-    ))
+
+def _add_comparison_row(
+    table: Table, commit_label: str, result: dict[str, Any], is_base: bool = False
+) -> None:
+    """Add a row to the comparison table."""
+    overall = result.get("overall_adherence", 0)
+    dimensional = result.get("dimensional_scores", {})
+
+    style = "bold green" if is_base else ""
+
+    table.add_row(
+        f"[{style}]{commit_label}[/{style}]",
+        f"[{_get_score_color(overall)}]{overall:.3f}[/{_get_score_color(overall)}]",
+        f"{dimensional.get('architectural', 0):.3f}",
+        f"{dimensional.get('quality', 0):.3f}",
+        f"{dimensional.get('typescript', 0):.3f}",
+        f"{dimensional.get('framework', 0):.3f}",
+        f"{dimensional.get('domain_adherence', 0):.3f}",
+    )
 
 
-def _display_info(info_data):
-    """Display scorer and repository information."""
-    # Repository info
-    console.print(Panel(
-        f"[bold]Repository Information[/bold]\n"
-        f"Path: {info_data['repo_path']}\n"
-        f"Supported Languages: {', '.join(info_data['supported_languages'])}",
-        title="Repository"
-    ))
-
-    # Model info
-    model_info = info_data['model_info']
-    console.print(Panel(
-        f"[bold]Model Configuration[/bold]\n"
-        f"Model: {model_info['model_name']}\n"
-        f"Device: {model_info['device']}\n"
-        f"Max Length: {model_info['max_length']}\n"
-        f"Embedding Dimension: {model_info['embedding_dim']}\n"
-        f"Cache Size: {model_info['cache_size']} embeddings\n"
-        f"MPS Available: {model_info['mps_available']}\n"
-        f"CUDA Available: {model_info['cuda_available']}",
-        title="Model"
-    ))
-
-    # Configuration
-    config = info_data['config']
-    console.print(Panel(
-        f"[bold]Scorer Configuration[/bold]\n"
-        f"Distance Metric: {config['distance_metric']}\n"
-        f"Max Files: {config['max_files'] or 'Unlimited'}\n"
-        f"Cache Embeddings: {config['cache_embeddings']}\n"
-        f"Normalize Embeddings: {config['normalize_embeddings']}",
-        title="Configuration"
-    ))
+def _save_results(
+    results: dict[str, Any], output_path: str, scorer: MultiDimensionalScorer
+) -> str:
+    """Save results using the scorer's save method."""
+    try:
+        saved_path = scorer.save_results(results, output_path)
+        return saved_path
+    except Exception:
+        # Fallback to simple JSON save
+        with open(output_path, "w") as f:
+            json.dump(results, f, indent=2, default=str)
+        return output_path
 
 
-def _interpret_score(score: float) -> str:
-    """Interpret similarity score into human-readable text."""
+def _get_score_color(score: float) -> str:
+    """Get color for score display."""
     if score >= 0.8:
-        return "Very High - Follows existing patterns closely"
+        return "green"
     elif score >= 0.6:
-        return "Good - Reasonably consistent with codebase"
-    elif score >= 0.4:
-        return "Moderate - Some alignment with existing code"
-    elif score >= 0.2:
-        return "Low - Different patterns from existing code"
+        return "yellow"
     else:
-        return "Very Low - Significantly different approach"
+        return "red"
 
 
-def _save_results_to_file(result, output_path: str):
-    """Save results to JSON file."""
-    from dataclasses import asdict
-
-    # Convert to dictionary format
-    if hasattr(result, '__dict__'):
-        result_dict = asdict(result)
+def _get_score_interpretation(score: float) -> str:
+    """Get human-readable interpretation of score."""
+    if score >= 0.9:
+        return "Excellent"
+    elif score >= 0.8:
+        return "Very Good"
+    elif score >= 0.7:
+        return "Good"
+    elif score >= 0.6:
+        return "Fair"
+    elif score >= 0.5:
+        return "Needs Improvement"
     else:
-        result_dict = result
-
-    # Make JSON serializable
-    result_dict = _make_json_serializable(result_dict)
-
-    with open(output_path, 'w') as f:
-        json.dump(result_dict, f, indent=2)
+        return "Poor"
 
 
-def _save_batch_results_to_file(results, output_path: str):
-    """Save batch results to JSON file."""
-    from dataclasses import asdict
-
-    results_list = []
-    for result in results:
-        result_dict = asdict(result)
-        result_dict = _make_json_serializable(result_dict)
-        results_list.append(result_dict)
-
-    with open(output_path, 'w') as f:
-        json.dump(results_list, f, indent=2)
+def _get_severity_color(severity: str) -> str:
+    """Get color for severity display."""
+    severity_colors = {
+        "critical": "bright_red",
+        "error": "red",
+        "warning": "yellow",
+        "info": "blue",
+    }
+    return severity_colors.get(severity.lower(), "white")
 
 
-def _make_json_serializable(obj):
-    """Convert objects to JSON-serializable format."""
-    import numpy as np
-
-    if isinstance(obj, np.ndarray):
-        return obj.tolist()
-    elif isinstance(obj, (np.integer, np.int64)):
-        return int(obj)
-    elif isinstance(obj, (np.floating, np.float64)):
-        return float(obj)
-    elif isinstance(obj, dict):
-        return {k: _make_json_serializable(v) for k, v in obj.items()}
-    elif isinstance(obj, (list, tuple)):
-        return [_make_json_serializable(item) for item in obj]
-    else:
-        return obj
-
-
-def main():
-    """Main entry point for the CLI."""
+if __name__ == "__main__":
     cli()
-
-
-if __name__ == '__main__':
-    main()

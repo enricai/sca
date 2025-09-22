@@ -241,6 +241,7 @@ analysis_output/
 # Temporary analysis files
 temp_analysis/
 .temp_analysis/
+.sca_cache/
 
 # Large model files (if stored locally)
 models/
@@ -347,3 +348,5 @@ safety-report.txt
 build/
 dist/
 *.egg-info/
+
+.mcp.json
