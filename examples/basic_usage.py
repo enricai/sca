@@ -37,22 +37,25 @@ from pathlib import Path
 # Add the package to Python path for development
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
+from rich.console import Console
+
 from semantic_code_analyzer import EnhancedScorerConfig, MultiDimensionalScorer
 
 
 def example_basic_analysis() -> None:
     """Basic example of analyzing a single commit."""
-    print("🔍 Basic Multi-Dimensional Analysis Example")
-    print("=" * 50)
+    console = Console()
+    console.print("🔍 Basic Multi-Dimensional Analysis Example")
+    console.print("=" * 50)
 
     # Configuration with default weights
     config = EnhancedScorerConfig()
 
-    print("📊 Using configuration:")
-    print(f"   Architectural: {config.architectural_weight}")
-    print(f"   Quality: {config.quality_weight}")
-    print(f"   TypeScript: {config.typescript_weight}")
-    print(f"   Framework: {config.framework_weight}")
+    console.print("📊 Using configuration:")
+    console.print(f"   Architectural: {config.architectural_weight}")
+    console.print(f"   Quality: {config.quality_weight}")
+    console.print(f"   TypeScript: {config.typescript_weight}")
+    console.print(f"   Framework: {config.framework_weight}")
 
     # Initialize scorer
     scorer = MultiDimensionalScorer(config, repo_path=".")
@@ -63,48 +66,49 @@ def example_basic_analysis() -> None:
 
         repo = git.Repo(".")
         latest_commit = str(repo.head.commit)
-        print(f"\n🔍 Analyzing latest commit: {latest_commit[:8]}")
+        console.print(f"\n🔍 Analyzing latest commit: {latest_commit[:8]}")
 
         # Perform analysis
         results = scorer.analyze_commit(latest_commit)
 
         # Display results
-        print("\n📊 Results:")
-        print(f"   Overall adherence: {results['overall_adherence']:.3f}")
-        print(f"   Confidence: {results['confidence']:.3f}")
+        console.print("\n📊 Results:")
+        console.print(f"   Overall adherence: {results['overall_adherence']:.3f}")
+        console.print(f"   Confidence: {results['confidence']:.3f}")
 
         # Show dimensional breakdown
         dimensional_scores = results.get("dimensional_scores", {})
-        print("\n📈 Dimensional Scores:")
+        console.print("\n📈 Dimensional Scores:")
         for dimension, score in dimensional_scores.items():
-            print(f"   {dimension:12}: {score:.3f}")
+            console.print(f"   {dimension:12}: {score:.3f}")
 
         # Show pattern summary
         pattern_analysis = results.get("pattern_analysis", {})
         if pattern_analysis:
-            print("\n🔍 Pattern Analysis:")
-            print(
+            console.print("\n🔍 Pattern Analysis:")
+            console.print(
                 f"   Total patterns: {pattern_analysis.get('total_patterns_found', 0)}"
             )
-            print(
+            console.print(
                 f"   Avg confidence: {pattern_analysis.get('pattern_confidence_avg', 0):.3f}"
             )
 
         # Show top recommendations
         feedback = results.get("actionable_feedback", [])
         if feedback:
-            print("\n💡 Top Recommendations:")
+            console.print("\n💡 Top Recommendations:")
             for i, rec in enumerate(feedback[:3], 1):
-                print(f"   {i}. [{rec['severity'].upper()}] {rec['message']}")
+                console.print(f"   {i}. [{rec['severity'].upper()}] {rec['message']}")
 
     except Exception as e:
-        print(f"❌ Analysis failed: {e}")
+        console.print(f"❌ Analysis failed: {e}")
 
 
 def example_custom_weights() -> None:
     """Example with custom scoring weights."""
-    print("\n\n⚖️  Custom Weights Analysis Example")
-    print("=" * 50)
+    console = Console()
+    console.print("\n\n⚖️  Custom Weights Analysis Example")
+    console.print("=" * 50)
 
     # Custom configuration emphasizing code quality
     config = EnhancedScorerConfig(
@@ -114,11 +118,11 @@ def example_custom_weights() -> None:
         framework_weight=0.10,
     )
 
-    print("📊 Custom configuration (quality-focused):")
-    print(f"   Quality: {config.quality_weight} (emphasized)")
-    print(f"   TypeScript: {config.typescript_weight} (emphasized)")
-    print(f"   Architectural: {config.architectural_weight}")
-    print(f"   Framework: {config.framework_weight}")
+    console.print("📊 Custom configuration (quality-focused):")
+    console.print(f"   Quality: {config.quality_weight} (emphasized)")
+    console.print(f"   TypeScript: {config.typescript_weight} (emphasized)")
+    console.print(f"   Architectural: {config.architectural_weight}")
+    console.print(f"   Framework: {config.framework_weight}")
 
     # Example with mock files
     mock_files = {
@@ -167,18 +171,19 @@ export default QualityExample;
     scorer = MultiDimensionalScorer(config, repo_path=".")
     results = scorer.analyze_files(mock_files)
 
-    print("\n📊 Results with custom weights:")
-    print(f"   Overall adherence: {results['overall_adherence']:.3f}")
+    console.print("\n📊 Results with custom weights:")
+    console.print(f"   Overall adherence: {results['overall_adherence']:.3f}")
 
     dimensional_scores = results.get("dimensional_scores", {})
     for dimension, score in dimensional_scores.items():
-        print(f"   {dimension:12}: {score:.3f}")
+        console.print(f"   {dimension:12}: {score:.3f}")
 
 
 def example_file_analysis() -> None:
     """Example of analyzing files without git context."""
-    print("\n\n📁 File Analysis Example")
-    print("=" * 50)
+    console = Console()
+    console.print("\n\n📁 File Analysis Example")
+    console.print("=" * 50)
 
     # Files with different quality levels
     files_to_analyze = {
@@ -222,33 +227,36 @@ export default Thing;
 
     results = scorer.analyze_files(files_to_analyze)
 
-    print("📊 File Analysis Results:")
-    print(f"   Overall adherence: {results['overall_adherence']:.3f}")
+    console.print("📊 File Analysis Results:")
+    console.print(f"   Overall adherence: {results['overall_adherence']:.3f}")
 
     # Show file-level breakdown
     file_analysis = results.get("file_level_analysis", {})
     for file_path, file_data in file_analysis.items():
-        print(f"\n   📄 {file_path}:")
+        console.print(f"\n   📄 {file_path}:")
         scores = file_data.get("scores", {})
         for analyzer, score in scores.items():
-            print(f"      {analyzer}: {score:.3f}")
+            console.print(f"      {analyzer}: {score:.3f}")
 
 
 if __name__ == "__main__":
+    console = Console()
     try:
         example_basic_analysis()
         example_custom_weights()
         example_file_analysis()
 
-        print("\n🎉 All examples completed successfully!")
-        print("\n💡 Next steps:")
-        print("   • Run: python -m semantic_code_analyzer.cli analyze <commit_hash>")
-        print(
+        console.print("\n🎉 All examples completed successfully!")
+        console.print("\n💡 Next steps:")
+        console.print(
+            "   • Run: python -m semantic_code_analyzer.cli analyze <commit_hash>"
+        )
+        console.print(
             "   • Compare: python -m semantic_code_analyzer.cli compare --base-commit <base> --compare-commits <others>"
         )
 
     except Exception as e:
-        print(f"❌ Example failed: {e}")
+        console.print(f"❌ Example failed: {e}")
         import traceback
 
         traceback.print_exc()

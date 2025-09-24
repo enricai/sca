@@ -32,11 +32,13 @@ from __future__ import annotations
 import json
 import logging
 import time
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
 import git
+from rich.console import Console
 
 from ..analyzers import (
     AnalysisResult,
@@ -49,6 +51,7 @@ from ..analyzers import (
     Recommendation,
     TypeScriptAnalyzer,
 )
+from ..hardware import DeviceManager
 from .weighted_aggregator import AggregatedResult, WeightedAggregator
 
 logger = logging.getLogger(__name__)
@@ -141,33 +144,110 @@ class MultiDimensionalScorer:
     - Framework-specific pattern analysis
     """
 
-    def __init__(self, config: EnhancedScorerConfig, repo_path: str = "."):
+    def __init__(
+        self,
+        config: EnhancedScorerConfig,
+        repo_path: str = ".",
+        device_manager: DeviceManager | None = None,
+        progress_callback: Callable[[str], None] | None = None,
+    ):
         """Initialize the MultiDimensionalScorer with configuration.
 
         Args:
             config: Configuration for the multi-dimensional scorer.
             repo_path: Path to the git repository (default: current directory).
+            device_manager: DeviceManager for hardware acceleration (auto-created if None).
+            progress_callback: Optional callback to report initialization progress.
         """
+        logger.info("=== MULTIDIMENSIONAL SCORER INIT ===")
+        logger.info("Starting MultiDimensionalScorer initialization")
+
         self.config = config
         self.repo_path = Path(repo_path)
-        self.repo = git.Repo(self.repo_path)
+        self.console = Console()
+        self.progress_callback = progress_callback
+        logger.info(f"Repository path: {self.repo_path}")
+
+        # Helper function to report progress
+        def report_progress(message: str) -> None:
+            """Report progress if callback is available."""
+            if self.progress_callback:
+                self.progress_callback(message)
+
+        report_progress("Setting up repository connection...")
+        try:
+            logger.info("Initializing git repository...")
+            self.repo = git.Repo(self.repo_path)
+            logger.info("Git repository initialized successfully")
+        except Exception as e:
+            logger.error(f"Failed to initialize git repository: {e}")
+            raise
+
+        report_progress("Initializing scoring components...")
+        logger.info("Creating weighted aggregator...")
         self.aggregator = WeightedAggregator()
+        logger.info("Weighted aggregator created")
+
+        if device_manager is None:
+            report_progress("Setting up hardware acceleration...")
+            logger.info("Creating new DeviceManager (none provided)...")
+            self.device_manager = DeviceManager()
+            logger.info("New DeviceManager created")
+        else:
+            logger.info("Using provided DeviceManager")
+            self.device_manager = device_manager
 
         # Initialize analyzers based on configuration
+        logger.info("=== ANALYZER INITIALIZATION ===")
         self.analyzers: dict[str, BaseAnalyzer] = {}
+
         if config.enable_architectural_analysis:
-            self.analyzers["architectural"] = ArchitecturalAnalyzer()
+            report_progress("Initializing architectural analyzer...")
+            logger.info("Initializing ArchitecturalAnalyzer...")
+            try:
+                self.analyzers["architectural"] = ArchitecturalAnalyzer()
+                logger.info("ArchitecturalAnalyzer initialized successfully")
+            except Exception as e:
+                logger.error(f"Failed to initialize ArchitecturalAnalyzer: {e}")
+                raise
 
         if config.enable_quality_analysis:
-            self.analyzers["quality"] = QualityAnalyzer()
+            report_progress("Initializing code quality analyzer...")
+            logger.info("Initializing QualityAnalyzer...")
+            try:
+                self.analyzers["quality"] = QualityAnalyzer()
+                logger.info("QualityAnalyzer initialized successfully")
+            except Exception as e:
+                logger.error(f"Failed to initialize QualityAnalyzer: {e}")
+                raise
 
         if config.enable_typescript_analysis:
-            self.analyzers["typescript"] = TypeScriptAnalyzer()
+            report_progress("Initializing TypeScript analyzer...")
+            logger.info("Initializing TypeScriptAnalyzer...")
+            try:
+                self.analyzers["typescript"] = TypeScriptAnalyzer()
+                logger.info("TypeScriptAnalyzer initialized successfully")
+            except Exception as e:
+                logger.error(f"Failed to initialize TypeScriptAnalyzer: {e}")
+                raise
 
         if config.enable_framework_analysis:
-            self.analyzers["framework"] = FrameworkAnalyzer()
+            report_progress("Initializing framework analyzer...")
+            logger.info("Initializing FrameworkAnalyzer...")
+            try:
+                self.analyzers["framework"] = FrameworkAnalyzer()
+                logger.info("FrameworkAnalyzer initialized successfully")
+            except Exception as e:
+                logger.error(f"Failed to initialize FrameworkAnalyzer: {e}")
+                raise
 
         if config.enable_domain_adherence_analysis:
+            report_progress(
+                "Initializing domain adherence analyzer (loading ML models)..."
+            )
+            logger.info("Initializing DomainAwareAdherenceAnalyzer...")
+            logger.info("This is the most complex analyzer - involves model loading")
+
             domain_config = {
                 "similarity_threshold": config.similarity_threshold,
                 "domain_confidence_threshold": config.domain_confidence_threshold,
@@ -175,13 +255,36 @@ class MultiDimensionalScorer:
                 "model_name": config.model_name,
                 "cache_dir": config.cache_dir,
             }
-            self.analyzers["domain_adherence"] = DomainAwareAdherenceAnalyzer(
-                domain_config
-            )
+            logger.info(f"Domain config: {domain_config}")
 
+            def domain_progress_callback(message: str) -> None:
+                """Nested progress callback for domain analyzer."""
+                report_progress(f"Domain analyzer: {message}")
+
+            try:
+                logger.info(
+                    "Creating DomainAwareAdherenceAnalyzer with device_manager..."
+                )
+                self.analyzers["domain_adherence"] = DomainAwareAdherenceAnalyzer(
+                    domain_config,
+                    device_manager=self.device_manager,
+                    progress_callback=domain_progress_callback,
+                )
+                logger.info("DomainAwareAdherenceAnalyzer initialized successfully")
+            except Exception as e:
+                logger.error(
+                    f"CRITICAL: Failed to initialize DomainAwareAdherenceAnalyzer: {e}"
+                )
+                logger.exception(
+                    "Full traceback for DomainAwareAdherenceAnalyzer failure:"
+                )
+                raise
+
+        report_progress("Analyzers initialized successfully!")
         logger.info(
-            f"Initialized MultiDimensionalScorer with {len(self.analyzers)} analyzers"
+            f"=== INITIALIZATION COMPLETE === Initialized MultiDimensionalScorer with {len(self.analyzers)} analyzers"
         )
+        logger.info(f"Enabled analyzers: {list(self.analyzers.keys())}")
 
     def build_pattern_indices_from_codebase(self, target_commit: str = "HEAD") -> None:
         """Build pattern indices for domain-aware analysis from the entire codebase.
@@ -210,16 +313,16 @@ class MultiDimensionalScorer:
                     hasattr(item, "type")
                     and hasattr(item, "path")
                     and hasattr(item, "data_stream")
-                    and item.type == "blob"
+                    and item.type == "blob"  # type: ignore[union-attr]
                 ):  # It's a file, not a directory
-                    file_path = str(item.path)
+                    file_path = str(item.path)  # type: ignore[union-attr]
 
                     # Skip files based on exclude patterns
                     if self._should_exclude_file(file_path):
                         continue
 
                     try:
-                        file_content = item.data_stream.read().decode("utf-8")
+                        file_content = item.data_stream.read().decode("utf-8")  # type: ignore[union-attr]
                         codebase_files[str(file_path)] = file_content
                     except (UnicodeDecodeError, Exception) as e:
                         logger.debug(f"Skipping file {file_path}: {e}")
@@ -235,17 +338,28 @@ class MultiDimensionalScorer:
         except Exception as e:
             logger.error(f"Failed to build pattern indices: {e}")
 
-    def analyze_commit(self, commit_hash: str) -> dict[str, Any]:
+    def analyze_commit(
+        self, commit_hash: str, progress_callback: Callable[[str], None] | None = None
+    ) -> dict[str, Any]:
         """Perform comprehensive multi-dimensional analysis of a commit.
 
         Args:
             commit_hash: Git commit hash to analyze
+            progress_callback: Optional callback to report analysis progress
 
         Returns:
             Comprehensive analysis results with dimensional scores and recommendations
         """
         start_time = time.time()
         logger.info(f"Starting multi-dimensional analysis for commit {commit_hash}")
+
+        # Helper function to report progress
+        def report_progress(message: str) -> None:
+            """Report progress if callback is available."""
+            if progress_callback:
+                progress_callback(message)
+
+        report_progress("Extracting files from commit...")
 
         # Extract commit files using direct git integration
         commit_files = self._extract_commit_files(commit_hash)
@@ -266,13 +380,18 @@ class MultiDimensionalScorer:
                 isinstance(domain_analyzer, DomainAwareAdherenceAnalyzer)
                 and not domain_analyzer._indices_built
             ):
+                report_progress("Building pattern indices for domain-aware analysis...")
                 logger.info("Building pattern indices for domain-aware analysis")
                 self.build_pattern_indices_from_codebase()
 
         # Run multi-dimensional analysis
-        dimensional_results = self._analyze_commit_dimensions(commit_files)
+        report_progress("Running multi-dimensional analysis...")
+        dimensional_results = self._analyze_commit_dimensions(
+            commit_files, progress_callback
+        )
 
         # Aggregate all results
+        report_progress("Aggregating results...")
         aggregated_results = self._aggregate_results(dimensional_results)
 
         # Generate enhanced output
@@ -390,19 +509,33 @@ class MultiDimensionalScorer:
         return False
 
     def _analyze_commit_dimensions(
-        self, commit_files: dict[str, str]
+        self,
+        commit_files: dict[str, str],
+        progress_callback: Callable[[str], None] | None = None,
     ) -> dict[str, dict[str, AnalysisResult]]:
         """Run multi-dimensional analysis on commit files.
 
         Args:
             commit_files: Dictionary mapping file paths to their content
+            progress_callback: Optional callback to report analysis progress
 
         Returns:
             Dictionary mapping analyzer names to their results
         """
         dimensional_results = {}
 
+        # Helper function to report progress
+        def report_progress(message: str) -> None:
+            """Report progress if callback is available."""
+            if progress_callback:
+                progress_callback(message)
+
         for analyzer_name, analyzer in self.analyzers.items():
+            # Report current analyzer progress
+            report_progress(
+                f"Analyzing with {analyzer_name} ({len(commit_files)} files)..."
+            )
+
             logger.debug(f"Running {analyzer_name} analysis")
             try:
                 results = analyzer.analyze_commit(commit_files)
@@ -748,3 +881,37 @@ class MultiDimensionalScorer:
                 )
 
         return summary
+
+    def get_hardware_fallback_report(self) -> dict[str, Any]:
+        """Get hardware fallback report from analyzers for user notification.
+
+        Returns:
+            Dictionary with fallback statistics from all analyzers.
+        """
+        fallback_report: dict[str, Any] = {
+            "has_any_fallbacks": False,
+            "analyzer_reports": {},
+            "summary_message": None,
+            "performance_impact": None,
+            "suggestions": [],
+        }
+
+        # Check domain adherence analyzer (most likely to have MPS issues)
+        if "domain_adherence" in self.analyzers:
+            analyzer = self.analyzers["domain_adherence"]
+            # Check if it has a pattern_indexer attribute with fallback reporting
+            if hasattr(analyzer, "pattern_indexer") and analyzer.pattern_indexer:
+                pattern_indexer = analyzer.pattern_indexer
+                if hasattr(pattern_indexer, "get_fallback_report"):
+                    report = pattern_indexer.get_fallback_report()
+                    fallback_report["analyzer_reports"]["domain_adherence"] = report
+
+                    if report["has_fallbacks"]:
+                        fallback_report["has_any_fallbacks"] = True
+                        fallback_report["summary_message"] = report["user_message"]
+                        fallback_report["performance_impact"] = report[
+                            "performance_impact"
+                        ]
+                        fallback_report["suggestions"].extend(report["suggestions"])
+
+        return fallback_report

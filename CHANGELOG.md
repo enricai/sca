@@ -187,7 +187,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Dependencies
 
 - Python 3.9+
-- PyTorch 2.1.0+ (with MPS support)
+- PyTorch 2.6.0+ (with MPS support and security fixes)
 - Transformers 4.35.0+
 - GitPython 3.1.40+
 - NumPy 1.24.0+

@@ -271,7 +271,7 @@ class WeightedAggregator:
             + 0.3 * score_level_factor
         )
 
-        return float(min(1.0, max(0.0, confidence)))
+        return min(1.0, max(0.0, float(confidence)))
 
     def _calculate_score_statistics(self, scores: dict[str, float]) -> dict[str, float]:
         """Calculate basic statistics for the scores."""

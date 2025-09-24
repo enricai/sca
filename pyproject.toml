@@ -139,6 +139,13 @@ no_implicit_optional = true
 warn_redundant_casts = true
 warn_unused_ignores = true
 
+[[tool.mypy.overrides]]
+module = [
+    "semantic_code_analyzer.embeddings.pattern_indexer",
+    "semantic_code_analyzer.scorers.multi_dimensional_scorer"
+]
+warn_unused_ignores = false
+
 # Pytest configuration
 [tool.pytest.ini_options]
 minversion = "7.0"

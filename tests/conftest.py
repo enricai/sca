@@ -26,6 +26,7 @@ Pytest configuration and shared fixtures for the test suite.
 
 from __future__ import annotations
 
+import os
 import tempfile
 from pathlib import Path
 from typing import Any
@@ -36,6 +37,15 @@ import numpy as np
 import pytest
 
 from semantic_code_analyzer import EnhancedScorerConfig
+
+# Set environment variables for safe testing before any imports
+os.environ["SCA_DISABLE_MODEL_LOADING"] = "1"
+os.environ["SCA_TEST_MODE"] = "1"
+os.environ["TOKENIZERS_PARALLELISM"] = "false"
+os.environ["HF_HUB_DISABLE_PROGRESS_BARS"] = "1"
+os.environ["HF_HUB_DISABLE_TELEMETRY"] = "1"
+os.environ["HF_HUB_DISABLE_EXPERIMENTAL_WARNING"] = "1"
+os.environ["TRANSFORMERS_NO_ADVISORY_WARNINGS"] = "1"
 
 # Set random seeds for reproducible tests
 np.random.seed(42)
@@ -197,6 +207,40 @@ export default function handler(req, res) {
 @pytest.fixture
 def enhanced_scorer_config() -> EnhancedScorerConfig:
     """Default enhanced scorer configuration for testing."""
+    import os
+
+    # Disable domain adherence during tests to prevent model loading segfaults
+    disable_models = os.getenv("SCA_DISABLE_MODEL_LOADING", "0") == "1"
+
+    if disable_models:
+        return EnhancedScorerConfig(
+            architectural_weight=0.30,
+            quality_weight=0.30,
+            typescript_weight=0.25,
+            framework_weight=0.15,
+            domain_adherence_weight=0.0,
+            enable_domain_adherence_analysis=False,
+            include_actionable_feedback=True,
+            include_pattern_details=True,
+            max_recommendations_per_file=5,
+        )
+    else:
+        return EnhancedScorerConfig(
+            architectural_weight=0.25,
+            quality_weight=0.25,
+            typescript_weight=0.20,
+            framework_weight=0.15,
+            domain_adherence_weight=0.15,
+            enable_domain_adherence_analysis=True,
+            include_actionable_feedback=True,
+            include_pattern_details=True,
+            max_recommendations_per_file=5,
+        )
+
+
+@pytest.fixture
+def enhanced_scorer_config_with_models() -> EnhancedScorerConfig:
+    """Enhanced scorer configuration with model loading enabled for specific tests."""
 
     return EnhancedScorerConfig(
         architectural_weight=0.25,
@@ -204,6 +248,7 @@ def enhanced_scorer_config() -> EnhancedScorerConfig:
         typescript_weight=0.20,
         framework_weight=0.15,
         domain_adherence_weight=0.15,
+        enable_domain_adherence_analysis=True,
         include_actionable_feedback=True,
         include_pattern_details=True,
         max_recommendations_per_file=5,

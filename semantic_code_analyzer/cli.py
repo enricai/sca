@@ -37,13 +37,113 @@ from typing import Any
 import click
 from rich.console import Console
 from rich.panel import Panel
-from rich.progress import track
+from rich.progress import Progress, SpinnerColumn, TextColumn, TimeElapsedColumn, track
 from rich.table import Table
 
+from .hardware import DeviceManager, DeviceType
 from .scorers import EnhancedScorerConfig, MultiDimensionalScorer
 
 console = Console()
 logger = logging.getLogger(__name__)
+
+
+def _run_pre_analysis_health_check(
+    device_preference: str, console: Console
+) -> tuple[bool, str]:
+    """Run pre-analysis health checks and get user confirmation if needed.
+
+    Args:
+        device_preference: Preferred device type (auto, cpu, mps, cuda)
+        console: Rich console for user interaction
+
+    Returns:
+        Tuple of (continue_analysis, device_to_use) where:
+        - continue_analysis: True if analysis should continue, False if user wants to abort
+        - device_to_use: Device preference, potentially modified based on user choice
+    """
+    if device_preference != "auto" and device_preference != "mps":
+        return True, device_preference  # Skip health check for non-MPS devices
+
+    # Check if we're on macOS with potential MPS issues
+    import platform
+
+    import torch
+
+    if platform.system() != "Darwin":
+        return True, device_preference  # Skip MPS checks on non-macOS
+
+    console.print("[dim]🔍 Running pre-analysis hardware health check...[/dim]")
+
+    issues_found = []
+    warnings = []
+
+    # Check PyTorch MPS availability
+    try:
+        if not hasattr(torch.backends, "mps") or not torch.backends.mps.is_available():
+            issues_found.append("MPS not available in current PyTorch installation")
+        else:
+            # Test basic MPS operations
+            try:
+                test_tensor = torch.randn(2, 2, device="mps")
+                torch.mm(test_tensor, test_tensor)
+                torch.mps.synchronize()
+                torch.mps.empty_cache()
+            except Exception as e:
+                issues_found.append(f"MPS operations test failed: {str(e)[:100]}")
+    except Exception as e:
+        issues_found.append(f"MPS compatibility check failed: {str(e)[:100]}")
+
+    # Check PyTorch version for known MPS issues
+    try:
+        torch_version = torch.__version__
+        if torch_version.startswith("1."):
+            warnings.append(
+                f"PyTorch {torch_version} has limited MPS support - consider upgrading"
+            )
+    except Exception:
+        warnings.append("Could not determine PyTorch version")
+
+    if not issues_found and not warnings:
+        console.print("[dim]✅ Hardware health check passed[/dim]")
+        return True, device_preference
+
+    # Display issues to user
+    if issues_found:
+        console.print("[yellow]⚠️  Hardware acceleration issues detected:[/yellow]")
+        for issue in issues_found:
+            console.print(f"[dim]  • {issue}[/dim]")
+
+    if warnings:
+        console.print("[yellow]⚠️  Hardware warnings:[/yellow]")
+        for warning in warnings:
+            console.print(f"[dim]  • {warning}[/dim]")
+
+    # Ask user how to proceed
+    console.print("")
+    console.print("[dim]Options:[/dim]")
+    console.print("[dim]  1. Continue with CPU fallback (slower but stable)[/dim]")
+    console.print(
+        "[dim]  2. Continue with MPS acceleration (may fail during analysis)[/dim]"
+    )
+    console.print("[dim]  3. Abort and fix issues first[/dim]")
+
+    while True:
+        choice = input("How would you like to proceed? (1/2/3): ").strip()
+        if choice == "1":
+            console.print("[dim]Using CPU fallback for stability[/dim]")
+            return True, "cpu"
+        elif choice == "2":
+            console.print(
+                "[yellow]⚠️  Continuing with MPS - may experience failures[/yellow]"
+            )
+            return True, device_preference
+        elif choice == "3":
+            console.print(
+                "[dim]Analysis aborted. Please address the issues above.[/dim]"
+            )
+            return False, device_preference
+        else:
+            console.print("[red]Please enter 1, 2, or 3[/red]")
 
 
 @click.group()
@@ -125,6 +225,12 @@ def cli(ctx: click.Context, verbose: bool, debug: bool) -> None:
     type=int,
     help="Maximum recommendations per file",
 )
+@click.option(
+    "--device",
+    type=click.Choice(["auto", "cpu", "mps", "cuda"]),
+    default="auto",
+    help="Hardware device preference for AI model acceleration (auto, cpu, mps, cuda)",
+)
 @click.pass_context
 def analyze(
     ctx: click.Context,
@@ -144,17 +250,33 @@ def analyze(
     disable_domain_adherence: bool,
     disable_pattern_indices: bool,
     max_recommendations: int,
+    device: str,
 ) -> None:
     """Perform multi-dimensional analysis on a commit."""
     console.print(f"[bold blue]Analyzing commit: {commit_hash}[/bold blue]")
 
+    logger.info("=== STARTING COMMIT ANALYSIS ===")
+    logger.info(f"Target commit: {commit_hash}")
+    logger.info(f"Repository path: {repo_path}")
+    logger.info(f"Output file: {output}")
+    logger.info(f"Device preference: {device}")
+    logger.info(f"Debug mode: {ctx.obj['debug']}")
+    logger.info(f"Verbose mode: {ctx.obj['verbose']}")
+
     # Calculate TypeScript weight as remainder
+    logger.info("=== WEIGHT CALCULATION ===")
+    logger.info(f"Architectural weight: {architectural_weight}")
+    logger.info(f"Quality weight: {quality_weight}")
+    logger.info(f"Framework weight: {framework_weight}")
+    logger.info(f"Domain adherence weight: {domain_adherence_weight}")
+
     typescript_weight = 1.0 - (
         architectural_weight
         + quality_weight
         + framework_weight
         + domain_adherence_weight
     )
+    logger.info(f"Calculated TypeScript weight: {typescript_weight}")
 
     # Validate all weights are positive and sum to 1.0
     if typescript_weight < 0:
@@ -176,6 +298,9 @@ def analyze(
         )
 
     # Create configuration
+    logger.info("=== CREATING CONFIGURATION ===")
+    logger.info("Creating EnhancedScorerConfig...")
+
     config = EnhancedScorerConfig(
         architectural_weight=architectural_weight,
         quality_weight=quality_weight,
@@ -194,23 +319,143 @@ def analyze(
         include_actionable_feedback=True,
         include_pattern_details=ctx.obj["verbose"],
     )
+    logger.info("EnhancedScorerConfig created successfully")
 
     try:
-        # Initialize scorer
-        with console.status("[bold green]Initializing analyzers..."):
-            scorer = MultiDimensionalScorer(config, repo_path)
+        # Initialize DeviceManager for hardware acceleration
+        logger.info("=== DEVICE MANAGER INITIALIZATION ===")
+        device_preference = None if device == "auto" else DeviceType(device.lower())
+        logger.info(f"Device preference: {device_preference}")
+
+        # Run pre-analysis health check for MPS devices
+        should_continue, final_device = _run_pre_analysis_health_check(device, console)
+        if not should_continue:
+            console.print("[yellow]Analysis aborted by user[/yellow]")
+            sys.exit(0)
+
+        # Use the device choice from health check (may have changed to CPU)
+        device = final_device
+        device_preference = None if device == "auto" else DeviceType(device.lower())
+
+        logger.info("Starting DeviceManager initialization...")
+
+        with console.status("[bold green]Initializing hardware acceleration..."):
+            try:
+                device_manager = DeviceManager(prefer_device=device_preference)
+            except Exception as e:
+                logger.error(f"CRITICAL: DeviceManager initialization failed: {e}")
+                console.print(
+                    f"[red]❌ Hardware acceleration initialization failed: {e}[/red]"
+                )
+                if "mps" in str(e).lower():
+                    console.print(
+                        "[yellow]⚠️  MPS acceleration unavailable - analysis will be slower[/yellow]"
+                    )
+                    console.print(
+                        "[dim]   Suggestion: Check PyTorch installation or use --device cpu[/dim]"
+                    )
+                raise
+
+        logger.info("DeviceManager initialized successfully")
+
+        # Display hardware information with enhanced status reporting
+        logger.info("=== HARDWARE INFORMATION ===")
+        hardware_info = device_manager.hardware_info
+        device_status = device_manager.get_device_status_report()
+
+        logger.info(f"Device name: {hardware_info.device_name}")
+        logger.info(f"Device type: {hardware_info.device_type}")
+        logger.info(f"Platform: {hardware_info.platform}")
+        logger.info(f"Architecture: {hardware_info.architecture}")
+        logger.info(f"Memory GB: {hardware_info.memory_gb}")
+        logger.info(f"Apple Silicon: {hardware_info.is_apple_silicon}")
+        logger.info(f"Chip generation: {hardware_info.chip_generation}")
+        logger.info(f"Supports MPS: {hardware_info.supports_mps}")
+        logger.info(f"Supports CUDA: {hardware_info.supports_cuda}")
+
+        # Enhanced user-facing device status display
+        device_icon = (
+            "⚡"
+            if hardware_info.device_type == DeviceType.MPS
+            else "🖥️" if hardware_info.device_type == DeviceType.CUDA else "💻"
+        )
+        console.print(
+            f"[dim]{device_icon} Using: {hardware_info.device_name} "
+            f"({hardware_info.memory_gb:.1f}GB memory)[/dim]"
+        )
+
+        # Display warnings prominently to users
+        if device_status["warnings"]:
+            for warning in device_status["warnings"]:
+                if warning["level"] == "warning":
+                    console.print(f"[yellow]⚠️  {warning['message']}[/yellow]")
+                    console.print(f"[dim]   Impact: {warning['impact']}[/dim]")
+                    console.print(f"[dim]   Suggestion: {warning['suggestion']}[/dim]")
+
+        # Display performance expectations
+        if device_status["performance_notes"]:
+            performance_note = device_status["performance_notes"][
+                0
+            ]  # Show primary note
+            console.print(f"[dim]📊 Performance: {performance_note}[/dim]")
+
+        # Initialize scorer with DeviceManager using progress tracking
+        logger.info("=== MULTIDIMENSIONAL SCORER INITIALIZATION ===")
+        logger.info("Starting MultiDimensionalScorer initialization...")
+
+        # Create progress bar for analyzer initialization
+        with Progress(
+            SpinnerColumn(),
+            TextColumn("[progress.description]{task.description}"),
+            TimeElapsedColumn(),
+            console=console,
+        ) as progress:
+            # Add main initialization task
+            init_task = progress.add_task(
+                "[bold green]Initializing analyzers...", total=None
+            )
+
+            def progress_callback(message: str) -> None:
+                """Progress callback to update the task description."""
+                progress.update(init_task, description=f"[bold green]{message}")
+                logger.info(f"Progress: {message}")
+
+            scorer = MultiDimensionalScorer(
+                config, repo_path, device_manager, progress_callback=progress_callback
+            )
+
+        logger.info("MultiDimensionalScorer initialized successfully")
 
         # Perform analysis
-        console.print("[bold green]Running multi-dimensional analysis...[/bold green]")
         start_time = time.time()
 
-        results = scorer.analyze_commit(commit_hash)
+        results = scorer.analyze_commit(
+            commit_hash, progress_callback=progress_callback
+        )
 
         analysis_time = time.time() - start_time
         console.print(f"[green]Analysis completed in {analysis_time:.2f}s[/green]")
 
         # Display results
         _display_results(results, ctx.obj["verbose"])
+
+        # Report hardware fallbacks to user
+        fallback_report = scorer.get_hardware_fallback_report()
+        if fallback_report["has_any_fallbacks"]:
+            console.print("")  # Add spacing
+            console.print("[yellow]⚠️  Hardware Acceleration Issues Detected[/yellow]")
+            console.print(f"[dim]{fallback_report['summary_message']}[/dim]")
+            if fallback_report["performance_impact"]:
+                console.print(
+                    f"[dim]Performance impact: {fallback_report['performance_impact']}[/dim]"
+                )
+
+            if fallback_report["suggestions"]:
+                console.print("[dim]Suggestions:[/dim]")
+                for suggestion in fallback_report["suggestions"][
+                    :2
+                ]:  # Show top 2 suggestions
+                    console.print(f"[dim]  • {suggestion}[/dim]")
 
         # Save results if requested
         if output:
@@ -235,6 +480,12 @@ def analyze(
 )
 @click.option("--repo-path", "-r", default=".", help="Path to repository")
 @click.option("--output", "-o", help="Output file for comparison results")
+@click.option(
+    "--device",
+    type=click.Choice(["auto", "cpu", "mps", "cuda"]),
+    default="auto",
+    help="Hardware device preference for AI model acceleration (auto, cpu, mps, cuda)",
+)
 @click.pass_context
 def compare(
     ctx: click.Context,
@@ -242,6 +493,7 @@ def compare(
     compare_commits: str,
     repo_path: str,
     output: str | None,
+    device: str,
 ) -> None:
     """Compare multiple commits against a base implementation."""
     commits_to_compare = [c.strip() for c in compare_commits.split(",")]
@@ -250,9 +502,57 @@ def compare(
         f"[bold blue]Comparing {len(commits_to_compare)} commits against base: {base_commit}[/bold blue]"
     )
 
+    # Run pre-analysis health check for MPS devices
+    should_continue, final_device = _run_pre_analysis_health_check(device, console)
+    if not should_continue:
+        console.print("[yellow]Comparison aborted by user[/yellow]")
+        sys.exit(0)
+
+    # Use the device choice from health check (may have changed to CPU)
+    device = final_device
+
+    # Initialize DeviceManager for hardware acceleration
+    device_preference = None if device == "auto" else DeviceType(device.lower())
+    with console.status("[bold green]Initializing hardware acceleration..."):
+        try:
+            device_manager = DeviceManager(prefer_device=device_preference)
+        except Exception as e:
+            console.print(
+                f"[red]❌ Hardware acceleration initialization failed: {e}[/red]"
+            )
+            if "mps" in str(e).lower():
+                console.print(
+                    "[yellow]⚠️  MPS acceleration unavailable - analysis will be slower[/yellow]"
+                )
+                console.print(
+                    "[dim]   Suggestion: Check PyTorch installation or use --device cpu[/dim]"
+                )
+            raise
+
+    # Display hardware information with enhanced status reporting
+    hardware_info = device_manager.hardware_info
+    device_status = device_manager.get_device_status_report()
+
+    device_icon = (
+        "⚡"
+        if hardware_info.device_type == DeviceType.MPS
+        else "🖥️" if hardware_info.device_type == DeviceType.CUDA else "💻"
+    )
+    console.print(
+        f"[dim]{device_icon} Using: {hardware_info.device_name} "
+        f"({hardware_info.memory_gb:.1f}GB memory)[/dim]"
+    )
+
+    # Display warnings prominently to users
+    if device_status["warnings"]:
+        for warning in device_status["warnings"]:
+            if warning["level"] == "warning":
+                console.print(f"[yellow]⚠️  {warning['message']}[/yellow]")
+                console.print(f"[dim]   Impact: {warning['impact']}[/dim]")
+
     # Default configuration for comparison
     config = EnhancedScorerConfig()
-    scorer = MultiDimensionalScorer(config, repo_path)
+    scorer = MultiDimensionalScorer(config, repo_path, device_manager)
 
     # Analyze all commits
     all_results = {}
@@ -274,6 +574,24 @@ def compare(
 
     # Display comparison
     _display_comparison(all_results, base_commit)
+
+    # Report hardware fallbacks to user
+    fallback_report = scorer.get_hardware_fallback_report()
+    if fallback_report["has_any_fallbacks"]:
+        console.print("")  # Add spacing
+        console.print("[yellow]⚠️  Hardware Acceleration Issues Detected[/yellow]")
+        console.print(f"[dim]{fallback_report['summary_message']}[/dim]")
+        if fallback_report["performance_impact"]:
+            console.print(
+                f"[dim]Performance impact: {fallback_report['performance_impact']}[/dim]"
+            )
+
+        if fallback_report["suggestions"]:
+            console.print("[dim]Suggestions:[/dim]")
+            for suggestion in fallback_report["suggestions"][
+                :2
+            ]:  # Show top 2 suggestions
+                console.print(f"[dim]  • {suggestion}[/dim]")
 
     # Save comparison results
     if output:

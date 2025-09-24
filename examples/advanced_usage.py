@@ -39,13 +39,16 @@ from typing import Any
 # Add the package to Python path for development
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
+from rich.console import Console
+
 from semantic_code_analyzer import EnhancedScorerConfig, MultiDimensionalScorer
 
 
 def example_commit_comparison() -> None:
     """Advanced example of comparing multiple commits."""
-    print("🔍 Advanced Commit Comparison Example")
-    print("=" * 50)
+    console = Console()
+    console.print("🔍 Advanced Commit Comparison Example")
+    console.print("=" * 50)
 
     # Configuration optimized for comparison
     config = EnhancedScorerConfig(
@@ -70,20 +73,20 @@ def example_commit_comparison() -> None:
             base_commit = commits[0]  # Latest commit
             compare_commits = commits[1:3]  # Previous commits
 
-            print("🔍 Comparing commits:")
-            print(f"   Base: {base_commit[:8]}")
+            console.print("🔍 Comparing commits:")
+            console.print(f"   Base: {base_commit[:8]}")
             for i, commit in enumerate(compare_commits, 1):
-                print(f"   Compare {i}: {commit[:8]}")
+                console.print(f"   Compare {i}: {commit[:8]}")
 
             # Perform comparison
             comparison_results = scorer.compare_commits(base_commit, compare_commits)
 
             # Display results
-            print("\n📊 Comparison Results:")
+            console.print("\n📊 Comparison Results:")
             summary = comparison_results.get("comparison_summary", {})
 
             base_score = summary.get("base_score", 0)
-            print(f"   Base score: {base_score:.3f}")
+            console.print(f"   Base score: {base_score:.3f}")
 
             comparisons = summary.get("comparisons", [])
             for comp in comparisons:
@@ -92,28 +95,29 @@ def example_commit_comparison() -> None:
                 improvement = comp["improvement"]
                 percentage = comp["improvement_percentage"]
 
-                print(
+                console.print(
                     f"   {commit_id}: {score:.3f} (base +{improvement:.3f}, {percentage:.1f}% better)"
                 )
 
                 # Show dimensional improvements
                 dim_improvements = comp.get("dimensional_improvements", {})
                 if dim_improvements:
-                    print("      Dimensional improvements:")
+                    console.print("      Dimensional improvements:")
                     for dim, improvement in dim_improvements.items():
-                        print(f"        {dim}: +{improvement:.1f}%")
+                        console.print(f"        {dim}: +{improvement:.1f}%")
 
         else:
-            print("⚠️  Not enough commits for comparison")
+            console.print("⚠️  Not enough commits for comparison")
 
     except Exception as e:
-        print(f"❌ Comparison failed: {e}")
+        console.print(f"❌ Comparison failed: {e}")
 
 
 def example_custom_configurations() -> None:
     """Example of different configuration strategies."""
-    print("\n\n⚖️  Custom Configuration Strategies")
-    print("=" * 50)
+    console = Console()
+    console.print("\n\n⚖️  Custom Configuration Strategies")
+    console.print("=" * 50)
 
     configurations = [
         {
@@ -215,11 +219,11 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 """
     }
 
-    print("📊 Comparing different focus configurations:")
-    print(
+    console.print("📊 Comparing different focus configurations:")
+    console.print(
         f"{'Configuration':<18} {'Overall':<10} {'Arch':<8} {'Quality':<8} {'TS':<8} {'Framework':<10}"
     )
-    print("-" * 72)
+    console.print("-" * 72)
 
     for config_info in configurations:
         config_name = config_info["name"]
@@ -233,20 +237,23 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         overall = results["overall_adherence"]
         dims = results.get("dimensional_scores", {})
 
-        print(
+        console.print(
             f"{config_name:<18} {overall:<10.3f} {dims.get('architectural', 0):<8.3f} "
             f"{dims.get('quality', 0):<8.3f} {dims.get('typescript', 0):<8.3f} "
             f"{dims.get('framework', 0):<8.3f}"
         )
 
-    print("\n💡 Key insight: Weight configuration significantly impacts scoring")
-    print("   Choose weights based on your project's priorities and standards.")
+    console.print(
+        "\n💡 Key insight: Weight configuration significantly impacts scoring"
+    )
+    console.print("   Choose weights based on your project's priorities and standards.")
 
 
 def example_pattern_analysis() -> None:
     """Example of detailed pattern analysis and insights."""
-    print("\n\n🔬 Detailed Pattern Analysis Example")
-    print("=" * 50)
+    console = Console()
+    console.print("\n\n🔬 Detailed Pattern Analysis Example")
+    console.print("=" * 50)
 
     # Enable all detailed options
     config = EnhancedScorerConfig(
@@ -473,29 +480,31 @@ export function generateStaticParams() {
     scorer = MultiDimensionalScorer(config, repo_path=".")
     results = scorer.analyze_files(complex_files)
 
-    print("📊 Detailed Analysis Results:")
-    print(f"   Overall adherence: {results['overall_adherence']:.3f}")
-    print(f"   Confidence: {results['confidence']:.3f}")
+    console.print("📊 Detailed Analysis Results:")
+    console.print(f"   Overall adherence: {results['overall_adherence']:.3f}")
+    console.print(f"   Confidence: {results['confidence']:.3f}")
 
     # Show pattern breakdown
     pattern_analysis = results.get("pattern_analysis", {})
     if pattern_analysis:
-        print("\n🔍 Pattern Analysis:")
-        print(f"   Total patterns: {pattern_analysis.get('total_patterns_found', 0)}")
-        print(
+        console.print("\n🔍 Pattern Analysis:")
+        console.print(
+            f"   Total patterns: {pattern_analysis.get('total_patterns_found', 0)}"
+        )
+        console.print(
             f"   Avg confidence: {pattern_analysis.get('pattern_confidence_avg', 0):.3f}"
         )
 
         patterns_by_type = pattern_analysis.get("patterns_by_type", {})
         if patterns_by_type:
-            print("   Patterns by type:")
+            console.print("   Patterns by type:")
             for pattern_type, count in patterns_by_type.items():
-                print(f"      {pattern_type}: {count}")
+                console.print(f"      {pattern_type}: {count}")
 
     # Show detailed recommendations
     feedback = results.get("actionable_feedback", [])
     if feedback:
-        print(f"\n💡 Actionable Feedback ({len(feedback)} items):")
+        console.print(f"\n💡 Actionable Feedback ({len(feedback)} items):")
 
         # Group by severity
         by_severity: dict[str, list[dict[str, Any]]] = {}
@@ -507,17 +516,18 @@ export function generateStaticParams() {
 
         for severity in ["critical", "error", "warning", "info"]:
             if severity in by_severity:
-                print(f"   {severity.upper()} ({len(by_severity[severity])}):")
+                console.print(f"   {severity.upper()} ({len(by_severity[severity])}):")
                 for rec in by_severity[severity][:3]:  # Show top 3 per severity
-                    print(f"      • {rec['message']}")
+                    console.print(f"      • {rec['message']}")
                     if rec.get("suggested_fix"):
-                        print(f"        Fix: {rec['suggested_fix']}")
+                        console.print(f"        Fix: {rec['suggested_fix']}")
 
 
 def example_configuration_tuning() -> None:
     """Example of tuning configuration for specific project needs."""
-    print("\n\n⚙️  Configuration Tuning Example")
-    print("=" * 50)
+    console = Console()
+    console.print("\n\n⚙️  Configuration Tuning Example")
+    console.print("=" * 50)
 
     # Different project types need different configurations
     project_configs = {
@@ -584,11 +594,11 @@ export default UserCard;
 """
     }
 
-    print("📊 Configuration comparison for the same code:")
-    print(
+    console.print("📊 Configuration comparison for the same code:")
+    console.print(
         f"{'Project Type':<15} {'Overall':<10} {'Arch':<8} {'Quality':<8} {'TS':<8} {'Framework':<10}"
     )
-    print("-" * 70)
+    console.print("-" * 70)
 
     for project_type, config in project_configs.items():
         scorer = MultiDimensionalScorer(config, repo_path=".")
@@ -597,19 +607,22 @@ export default UserCard;
         overall = results["overall_adherence"]
         dims = results.get("dimensional_scores", {})
 
-        print(
+        console.print(
             f"{project_type:<15} {overall:<10.3f} {dims.get('architectural', 0):<8.3f} "
             f"{dims.get('quality', 0):<8.3f} {dims.get('typescript', 0):<8.3f} "
             f"{dims.get('framework', 0):<8.3f}"
         )
 
-    print("\n🎯 Insight: Same code scores differently based on project priorities")
+    console.print(
+        "\n🎯 Insight: Same code scores differently based on project priorities"
+    )
 
 
 def example_ci_cd_integration() -> None:
     """Example of integrating with CI/CD pipelines."""
-    print("\n\n🔗 CI/CD Integration Example")
-    print("=" * 50)
+    console = Console()
+    console.print("\n\n🔗 CI/CD Integration Example")
+    console.print("=" * 50)
 
     def quality_gate_check(commit_hash: str, min_score: float = 0.7) -> dict[str, Any]:
         """
@@ -663,36 +676,36 @@ def example_ci_cd_integration() -> None:
         repo = git.Repo(".")
         latest_commit = str(repo.head.commit)
 
-        print(f"🔍 Running quality gate for commit: {latest_commit[:8]}")
+        console.print(f"🔍 Running quality gate for commit: {latest_commit[:8]}")
 
         check_result = quality_gate_check(latest_commit, min_score=0.7)
 
-        print("\n📊 Quality Gate Results:")
+        console.print("\n📊 Quality Gate Results:")
         if "error" in check_result:
-            print(f"   ❌ ERROR: {check_result['error']}")
-            print("   Exit code: 1")
+            console.print(f"   ❌ ERROR: {check_result['error']}")
+            console.print("   Exit code: 1")
         else:
             status = "✅ PASSED" if check_result["passed"] else "❌ FAILED"
-            print(f"   Status: {status}")
-            print(f"   Overall Score: {check_result['overall_score']:.3f}")
-            print(f"   Required Score: {check_result['min_score']}")
-            print(f"   Confidence: {check_result['confidence']:.3f}")
+            console.print(f"   Status: {status}")
+            console.print(f"   Overall Score: {check_result['overall_score']:.3f}")
+            console.print(f"   Required Score: {check_result['min_score']}")
+            console.print(f"   Confidence: {check_result['confidence']:.3f}")
 
             # Show dimensional breakdown
             dims = check_result["dimensional_scores"]
-            print("   Dimensional Scores:")
+            console.print("   Dimensional Scores:")
             for dim, score in dims.items():
-                print(f"      {dim}: {score:.3f}")
+                console.print(f"      {dim}: {score:.3f}")
 
             # Show critical issues
             critical_issues = check_result["critical_issues"]
             if critical_issues:
-                print(f"   ⚠️  Critical Issues ({len(critical_issues)}):")
+                console.print(f"   ⚠️  Critical Issues ({len(critical_issues)}):")
                 for issue in critical_issues:
-                    print(f"      • {issue['message']}")
+                    console.print(f"      • {issue['message']}")
 
             exit_code = 0 if check_result["passed"] else 1
-            print(f"   Exit code: {exit_code}")
+            console.print(f"   Exit code: {exit_code}")
 
         # Save results for CI/CD system
         ci_results = {
@@ -707,16 +720,17 @@ def example_ci_cd_integration() -> None:
         with open("quality_gate_results.json", "w") as f:
             json.dump(ci_results, f, indent=2, default=str)
 
-        print("   Results saved to: quality_gate_results.json")
+        console.print("   Results saved to: quality_gate_results.json")
 
     except Exception as e:
-        print(f"❌ CI/CD integration failed: {e}")
+        console.print(f"❌ CI/CD integration failed: {e}")
 
 
 def example_batch_analysis() -> None:
     """Example of analyzing multiple commits in batch."""
-    print("\n\n📦 Batch Analysis Example")
-    print("=" * 50)
+    console = Console()
+    console.print("\n\n📦 Batch Analysis Example")
+    console.print("=" * 50)
 
     config = EnhancedScorerConfig(
         include_actionable_feedback=False,  # Reduce output for batch
@@ -731,12 +745,12 @@ def example_batch_analysis() -> None:
         repo = git.Repo(".")
         commits = [str(commit) for commit in repo.iter_commits(max_count=5)]
 
-        print(f"📊 Batch analyzing {len(commits)} commits:")
+        console.print(f"📊 Batch analyzing {len(commits)} commits:")
 
         batch_results = []
         for i, commit_hash in enumerate(commits, 1):
             try:
-                print(f"   {i}/{len(commits)}: {commit_hash[:8]}...", end=" ")
+                console.print(f"   {i}/{len(commits)}: {commit_hash[:8]}...", end=" ")
 
                 start_time = time.time()
                 result = scorer.analyze_commit(commit_hash)
@@ -754,31 +768,33 @@ def example_batch_analysis() -> None:
                     }
                 )
 
-                print(f"✅ {result['overall_adherence']:.3f} ({analysis_time:.1f}s)")
+                console.print(
+                    f"✅ {result['overall_adherence']:.3f} ({analysis_time:.1f}s)"
+                )
 
             except Exception as e:
-                print(f"❌ Failed: {e}")
+                console.print(f"❌ Failed: {e}")
 
         # Analyze batch results
         if batch_results:
-            print("\n📈 Batch Analysis Summary:")
+            console.print("\n📈 Batch Analysis Summary:")
 
             overall_scores = [r["overall_score"] for r in batch_results]
             avg_score = sum(overall_scores) / len(overall_scores)
             max_score = max(overall_scores)
             min_score = min(overall_scores)
 
-            print(f"   Average score: {avg_score:.3f}")
-            print(f"   Score range: {min_score:.3f} - {max_score:.3f}")
+            console.print(f"   Average score: {avg_score:.3f}")
+            console.print(f"   Score range: {min_score:.3f} - {max_score:.3f}")
 
             # Find best and worst commits
             best_commit = max(batch_results, key=lambda r: r["overall_score"])
             worst_commit = min(batch_results, key=lambda r: r["overall_score"])
 
-            print(
+            console.print(
                 f"   Best commit: {best_commit['commit'][:8]} ({best_commit['overall_score']:.3f})"
             )
-            print(
+            console.print(
                 f"   Worst commit: {worst_commit['commit'][:8]} ({worst_commit['overall_score']:.3f})"
             )
 
@@ -798,13 +814,14 @@ def example_batch_analysis() -> None:
                     default=str,
                 )
 
-            print("   Results saved to: batch_analysis_results.json")
+            console.print("   Results saved to: batch_analysis_results.json")
 
     except Exception as e:
-        print(f"❌ Batch analysis failed: {e}")
+        console.print(f"❌ Batch analysis failed: {e}")
 
 
 if __name__ == "__main__":
+    console = Console()
     try:
         example_commit_comparison()
         example_custom_configurations()
@@ -813,17 +830,17 @@ if __name__ == "__main__":
         example_ci_cd_integration()
         example_batch_analysis()
 
-        print("\n🎉 All advanced examples completed successfully!")
-        print("\n🚀 Advanced Features Demonstrated:")
-        print("   ✅ Multi-commit comparison")
-        print("   ✅ Custom configuration strategies")
-        print("   ✅ Detailed pattern analysis")
-        print("   ✅ CI/CD quality gates")
-        print("   ✅ Batch processing")
-        print("   ✅ Project-specific tuning")
+        console.print("\n🎉 All advanced examples completed successfully!")
+        console.print("\n🚀 Advanced Features Demonstrated:")
+        console.print("   ✅ Multi-commit comparison")
+        console.print("   ✅ Custom configuration strategies")
+        console.print("   ✅ Detailed pattern analysis")
+        console.print("   ✅ CI/CD quality gates")
+        console.print("   ✅ Batch processing")
+        console.print("   ✅ Project-specific tuning")
 
     except Exception as e:
-        print(f"❌ Advanced example failed: {e}")
+        console.print(f"❌ Advanced example failed: {e}")
         import traceback
 
         traceback.print_exc()

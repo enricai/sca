@@ -235,6 +235,7 @@ embeddings_cache/
 # Analysis results
 similarity_results/
 analysis_output/
+analysis_results/
 *.analysis.json
 *_similarity_results.json
 

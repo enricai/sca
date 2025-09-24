@@ -47,7 +47,7 @@ class TestMultiDimensionalAnalysis:
             framework_weight=0.15,
             domain_adherence_weight=0.15,
         )
-        assert (  # noqa: S101
+        assert (
             abs(
                 sum(
                     [
@@ -82,7 +82,7 @@ class TestMultiDimensionalAnalysis:
 
             # Check that all expected analyzers are initialized
             expected = ["architectural", "quality", "typescript", "framework"]
-            assert all(a in scorer.analyzers for a in expected)  # noqa: S101
+            assert all(a in scorer.analyzers for a in expected)
 
     def test_file_analysis(
         self,
@@ -95,11 +95,11 @@ class TestMultiDimensionalAnalysis:
 
             results = scorer.analyze_files(sample_typescript_files)
 
-            assert "overall_adherence" in results  # noqa: S101
-            assert "dimensional_scores" in results  # noqa: S101
-            assert "confidence" in results  # noqa: S101
-            assert "pattern_analysis" in results  # noqa: S101
-            assert "actionable_feedback" in results  # noqa: S101
+            assert "overall_adherence" in results
+            assert "dimensional_scores" in results
+            assert "confidence" in results
+            assert "pattern_analysis" in results
+            assert "actionable_feedback" in results
 
             # Check that we got reasonable scores
             assert 0.0 <= results["overall_adherence"] <= 1.0  # noqa: S101
@@ -129,22 +129,29 @@ class TestMultiDimensionalAnalysis:
         self, sample_typescript_files: dict[str, str]
     ) -> None:
         """Test that different weight configurations produce different results."""
+        import os
+
+        # Disable domain adherence during tests to prevent model loading segfaults
+        disable_models = os.getenv("SCA_DISABLE_MODEL_LOADING", "0") == "1"
+
         # Configuration emphasizing architecture
         arch_config = EnhancedScorerConfig(
-            architectural_weight=0.60,
+            architectural_weight=0.70 if disable_models else 0.60,
             quality_weight=0.10,
             typescript_weight=0.10,
             framework_weight=0.10,
-            domain_adherence_weight=0.10,
+            domain_adherence_weight=0.0 if disable_models else 0.10,
+            enable_domain_adherence_analysis=not disable_models,
         )
 
         # Configuration emphasizing quality
         quality_config = EnhancedScorerConfig(
             architectural_weight=0.10,
-            quality_weight=0.60,
+            quality_weight=0.70 if disable_models else 0.60,
             typescript_weight=0.10,
             framework_weight=0.10,
-            domain_adherence_weight=0.10,
+            domain_adherence_weight=0.0 if disable_models else 0.10,
+            enable_domain_adherence_analysis=not disable_models,
         )
 
         with patch("git.Repo"):

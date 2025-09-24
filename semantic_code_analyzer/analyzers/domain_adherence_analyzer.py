@@ -32,6 +32,7 @@ from __future__ import annotations
 import logging
 import statistics
 import time
+from collections.abc import Callable
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
@@ -93,42 +94,118 @@ class DomainAwareAdherenceAnalyzer(BaseAnalyzer):
     4. Provides actionable recommendations for improvement
     """
 
-    def __init__(self, config: dict[str, Any] | None = None):
+    def __init__(
+        self,
+        config: dict[str, Any] | None = None,
+        device_manager: Any | None = None,
+        progress_callback: Callable[[str], None] | None = None,
+    ):
         """Initialize the DomainAwareAdherenceAnalyzer.
 
         Args:
             config: Optional configuration dictionary for the analyzer.
+            device_manager: DeviceManager for hardware acceleration (optional).
+            progress_callback: Optional callback to report initialization progress.
         """
-        super().__init__(config)
+        logger.info("=== DOMAIN ADHERENCE ANALYZER INIT ===")
+        logger.info("Starting DomainAwareAdherenceAnalyzer initialization")
+
+        # Store progress callback for reporting
+        self.progress_callback = progress_callback
+
+        # Helper function to report progress
+        def report_progress(message: str) -> None:
+            """Report progress if callback is available."""
+            if self.progress_callback:
+                self.progress_callback(message)
+
+        report_progress("Initializing base analyzer...")
+        try:
+            logger.info("Calling super().__init__(config)...")
+            super().__init__(config)
+            logger.info("Parent BaseAnalyzer initialized successfully")
+        except Exception as e:
+            logger.error(f"Failed to initialize parent BaseAnalyzer: {e}")
+            raise
 
         # Initialize components
-        self.domain_classifier = DomainClassifier(config)
+        report_progress("Initializing domain classifier...")
+        logger.info("Initializing DomainClassifier...")
+        try:
+            self.domain_classifier = DomainClassifier(config)
+            logger.info("DomainClassifier initialized successfully")
+        except Exception as e:
+            logger.error(f"Failed to initialize DomainClassifier: {e}")
+            raise
 
         # Handle config safely
         config = config or {}
+        logger.info(f"Using config: {config}")
 
         # Initialize pattern indexer if dependencies are available
+        report_progress("Checking ML model dependencies...")
+        logger.info("Checking PatternIndexer dependencies...")
         if PatternIndexer is not None:
-            self.pattern_indexer = PatternIndexer(
-                model_name=config.get("model_name", "microsoft/graphcodebert-base"),
-                cache_dir=config.get("cache_dir"),
-            )
+            report_progress("Loading GraphCodeBERT model (this may take a while)...")
+            logger.info("PatternIndexer dependencies available - initializing...")
+            logger.info("WARNING: This is where the segfault likely occurs!")
+
+            model_name = config.get("model_name", "microsoft/graphcodebert-base")
+            cache_dir = config.get("cache_dir")
+            logger.info(f"Model name: {model_name}")
+            logger.info(f"Cache dir: {cache_dir}")
+            logger.info(f"Device manager provided: {device_manager is not None}")
+
+            def pattern_indexer_progress_callback(message: str) -> None:
+                """Nested progress callback for pattern indexer."""
+                report_progress(f"Model loading: {message}")
+
+            try:
+                logger.info(
+                    "Creating PatternIndexer - this may load heavy ML models..."
+                )
+                self.pattern_indexer = PatternIndexer(
+                    model_name=model_name,
+                    cache_dir=cache_dir,
+                    device_manager=device_manager,
+                    progress_callback=pattern_indexer_progress_callback,
+                )
+                logger.info("PatternIndexer initialized successfully!")
+            except Exception as e:
+                logger.error(f"CRITICAL: PatternIndexer initialization failed: {e}")
+                logger.exception("Full traceback for PatternIndexer failure:")
+                raise
         else:
+            report_progress(
+                "ML model dependencies not available, using fallback mode..."
+            )
             logger.warning(
                 "PatternIndexer dependencies not available. Similarity search disabled."
             )
             self.pattern_indexer = None
 
         # Configuration parameters
+        report_progress("Finalizing analyzer configuration...")
+        logger.info("Setting configuration parameters...")
         self.similarity_threshold = config.get("similarity_threshold", 0.3)
         self.min_patterns_for_analysis = config.get("min_patterns_for_analysis", 3)
         self.max_similar_patterns = config.get("max_similar_patterns", 10)
         self.domain_confidence_threshold = config.get(
             "domain_confidence_threshold", 0.6
         )
+        logger.info(f"Similarity threshold: {self.similarity_threshold}")
+        logger.info(f"Min patterns for analysis: {self.min_patterns_for_analysis}")
+        logger.info(f"Max similar patterns: {self.max_similar_patterns}")
+        logger.info(f"Domain confidence threshold: {self.domain_confidence_threshold}")
 
         # Track if indices have been built
         self._indices_built: set[str] = set()
+
+        report_progress("Domain adherence analyzer ready!")
+        logger.info("=== DOMAIN ADHERENCE ANALYZER INITIALIZATION COMPLETE ===")
+
+        logger.info("=== DOMAIN ADHERENCE ANALYZER INIT COMPLETE ===")
+        logger.info("DomainAwareAdherenceAnalyzer initialized successfully!")
 
     def get_analyzer_name(self) -> str:
         """Return the name identifier for this analyzer.
@@ -667,9 +744,9 @@ class DomainAwareAdherenceAnalyzer(BaseAnalyzer):
         }
 
         if self.pattern_indexer is not None:
-            statistics_dict[
-                "pattern_indexer_stats"
-            ] = self.pattern_indexer.get_cache_statistics()
+            statistics_dict["pattern_indexer_stats"] = (
+                self.pattern_indexer.get_cache_statistics()
+            )
 
             for domain in self._indices_built:
                 domain_stats = self.pattern_indexer.get_domain_statistics(domain)
