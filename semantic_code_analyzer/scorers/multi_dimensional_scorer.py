@@ -97,6 +97,12 @@ class EnhancedScorerConfig:
     save_results: bool = True
     results_dir: str = "analysis_results"
 
+    # Progress reporting configuration
+    enable_progress_reporting: bool = True
+    progress_level: str = "normal"  # minimal, normal, detailed
+    show_file_progress: bool = True
+    progress_refresh_rate: int = 10
+
     def __post_init__(self) -> None:
         """Validate configuration after initialization."""
         # Validate weights sum to 1.0
@@ -150,6 +156,7 @@ class MultiDimensionalScorer:
         repo_path: str = ".",
         device_manager: DeviceManager | None = None,
         progress_callback: Callable[[str], None] | None = None,
+        progress_tracker: Any | None = None,
     ):
         """Initialize the MultiDimensionalScorer with configuration.
 
@@ -158,6 +165,7 @@ class MultiDimensionalScorer:
             repo_path: Path to the git repository (default: current directory).
             device_manager: DeviceManager for hardware acceleration (auto-created if None).
             progress_callback: Optional callback to report initialization progress.
+            progress_tracker: Optional progress tracker for enhanced progress indication.
         """
         logger.info("=== MULTIDIMENSIONAL SCORER INIT ===")
         logger.info("Starting MultiDimensionalScorer initialization")
@@ -166,6 +174,7 @@ class MultiDimensionalScorer:
         self.repo_path = Path(repo_path)
         self.console = Console()
         self.progress_callback = progress_callback
+        self.progress_tracker = progress_tracker
         logger.info(f"Repository path: {self.repo_path}")
 
         # Helper function to report progress
@@ -269,6 +278,7 @@ class MultiDimensionalScorer:
                     domain_config,
                     device_manager=self.device_manager,
                     progress_callback=domain_progress_callback,
+                    progress_tracker=self.progress_tracker,
                 )
                 logger.info("DomainAwareAdherenceAnalyzer initialized successfully")
             except Exception as e:
@@ -523,6 +533,8 @@ class MultiDimensionalScorer:
             Dictionary mapping analyzer names to their results
         """
         dimensional_results = {}
+        total_analyzers = len(self.analyzers)
+        analyzer_count = 0
 
         # Helper function to report progress
         def report_progress(message: str) -> None:
@@ -530,20 +542,99 @@ class MultiDimensionalScorer:
             if progress_callback:
                 progress_callback(message)
 
+        # Create file-level progress callback factory outside the loop
+        def create_file_progress_callback(
+            analyzer_name_local: str,
+        ) -> Callable[[str, int, int], None]:
+            """Create a file progress callback bound to the analyzer name."""
+
+            def file_progress_callback(
+                file_path: str, current: int, total: int
+            ) -> None:
+                """Report file-level progress for current analyzer."""
+                file_name = file_path.split("/")[-1] if "/" in file_path else file_path
+                progress_msg = (
+                    f"{analyzer_name_local}: Processing {file_name} ({current}/{total})"
+                )
+                report_progress(progress_msg)
+
+            return file_progress_callback
+
         for analyzer_name, analyzer in self.analyzers.items():
-            # Report current analyzer progress
+            analyzer_count += 1
+
+            # Report current analyzer progress with detailed info
             report_progress(
-                f"Analyzing with {analyzer_name} ({len(commit_files)} files)..."
+                f"Running {analyzer_name} analyzer ({analyzer_count}/{total_analyzers}) on {len(commit_files)} files..."
             )
 
             logger.debug(f"Running {analyzer_name} analysis")
+
             try:
-                results = analyzer.analyze_commit(commit_files)
+                # Create file-level progress callback for this analyzer
+                file_progress_callback = create_file_progress_callback(analyzer_name)
+
+                # Check if analyzer supports file progress reporting
+                if hasattr(analyzer, "analyze_commit_with_progress"):
+                    results = analyzer.analyze_commit_with_progress(
+                        commit_files, file_progress_callback
+                    )
+                else:
+                    # Fallback to standard analyze_commit but with simulated progress
+                    results = {}
+                    file_count = 0
+                    total_files = len(commit_files)
+
+                    for file_path, content in commit_files.items():
+                        if analyzer._should_analyze_file(file_path):
+                            file_count += 1
+                            file_progress_callback(file_path, file_count, total_files)
+                            try:
+                                results[file_path] = analyzer.analyze_file(
+                                    file_path, content
+                                )
+                            except Exception as e:
+                                logger.warning(
+                                    f"Failed to analyze {file_path} with {analyzer_name}: {e}"
+                                )
+                                # Create minimal result for failed analysis
+                                from ..analyzers.base_analyzer import (
+                                    AnalysisResult,
+                                    Recommendation,
+                                    Severity,
+                                )
+
+                                results[file_path] = AnalysisResult(
+                                    file_path=file_path,
+                                    score=0.0,
+                                    patterns_found=[],
+                                    recommendations=[
+                                        Recommendation(
+                                            severity=Severity.ERROR,
+                                            category="analysis_error",
+                                            message=f"Analysis failed: {e}",
+                                            file_path=file_path,
+                                            line_number=None,
+                                            suggested_fix=None,
+                                            rule_id="ANALYSIS_ERROR",
+                                        )
+                                    ],
+                                    metrics={"analysis_failed": True},
+                                    analysis_time=0.0,
+                                )
+
                 dimensional_results[analyzer_name] = results
                 logger.debug(f"{analyzer_name} analyzed {len(results)} files")
+
+                # Report completion of this analyzer
+                report_progress(
+                    f"Completed {analyzer_name} analysis ({len(results)} files processed)"
+                )
+
             except Exception as e:
                 logger.error(f"Error in {analyzer_name} analysis: {e}")
                 dimensional_results[analyzer_name] = {}
+                report_progress(f"Failed {analyzer_name} analysis: {str(e)[:50]}...")
 
         return dimensional_results
 

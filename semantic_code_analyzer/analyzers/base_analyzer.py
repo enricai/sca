@@ -32,6 +32,7 @@ import ast
 import logging
 import re
 from abc import ABC, abstractmethod
+from collections.abc import Callable
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
@@ -179,6 +180,63 @@ class BaseAnalyzer(ABC):
                         metrics={"analysis_failed": True},
                         analysis_time=0.0,
                     )
+        return results
+
+    def analyze_commit_with_progress(
+        self,
+        commit_files: dict[str, str],
+        progress_callback: Callable[[str, int, int], None] | None = None,
+    ) -> dict[str, AnalysisResult]:
+        """Analyze all files in a commit with progress reporting.
+
+        Args:
+            commit_files: Dictionary mapping file paths to their content
+            progress_callback: Optional callback for progress updates (file_path, current, total)
+
+        Returns:
+            Dictionary mapping file paths to their analysis results
+        """
+        results = {}
+        eligible_files = [
+            (file_path, content)
+            for file_path, content in commit_files.items()
+            if self._should_analyze_file(file_path)
+        ]
+
+        total_files = len(eligible_files)
+        current_file = 0
+
+        for file_path, content in eligible_files:
+            current_file += 1
+
+            # Report progress if callback is provided
+            if progress_callback:
+                progress_callback(file_path, current_file, total_files)
+
+            try:
+                results[file_path] = self.analyze_file(file_path, content)
+            except Exception as e:
+                logger.warning(f"Failed to analyze {file_path}: {e}")
+                # Create a minimal result for failed analysis
+                results[file_path] = AnalysisResult(
+                    file_path=file_path,
+                    score=0.0,
+                    patterns_found=[],
+                    recommendations=[
+                        Recommendation(
+                            severity=Severity.ERROR,
+                            category="analysis_error",
+                            message=f"Analysis failed: {e}",
+                            file_path=file_path,
+                            line_number=None,
+                            suggested_fix=None,
+                            rule_id="ANALYSIS_ERROR",
+                        )
+                    ],
+                    metrics={"analysis_failed": True},
+                    analysis_time=0.0,
+                )
+
         return results
 
     def learn_from_reference(self, reference_files: dict[str, str]) -> None:

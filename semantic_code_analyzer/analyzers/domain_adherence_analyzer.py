@@ -99,6 +99,7 @@ class DomainAwareAdherenceAnalyzer(BaseAnalyzer):
         config: dict[str, Any] | None = None,
         device_manager: Any | None = None,
         progress_callback: Callable[[str], None] | None = None,
+        progress_tracker: Any | None = None,
     ):
         """Initialize the DomainAwareAdherenceAnalyzer.
 
@@ -106,11 +107,13 @@ class DomainAwareAdherenceAnalyzer(BaseAnalyzer):
             config: Optional configuration dictionary for the analyzer.
             device_manager: DeviceManager for hardware acceleration (optional).
             progress_callback: Optional callback to report initialization progress.
+            progress_tracker: Optional progress tracker for enhanced progress indication.
         """
         logger.debug("Starting DomainAwareAdherenceAnalyzer initialization")
 
         # Store progress callback for reporting
         self.progress_callback = progress_callback
+        self.progress_tracker = progress_tracker
 
         # Helper function to report progress
         def report_progress(message: str) -> None:
@@ -154,6 +157,7 @@ class DomainAwareAdherenceAnalyzer(BaseAnalyzer):
                     cache_dir=cache_dir,
                     device_manager=device_manager,
                     progress_callback=pattern_indexer_progress_callback,
+                    progress_tracker=self.progress_tracker,
                 )
             except Exception as e:
                 logger.error(f"PatternIndexer initialization failed: {e}")

@@ -48,6 +48,7 @@ from transformers import RobertaModel, RobertaTokenizer
 
 from ..hardware.device_manager import DeviceManager, DeviceType
 from ..hardware.exceptions import FallbackError, ModelLoadingError
+from ..progress import AnalysisPhase, ProgressTracker
 
 logger = logging.getLogger(__name__)
 
@@ -103,6 +104,7 @@ class PatternIndexer:
         device_manager: DeviceManager | None = None,
         enable_optimizations: bool = True,
         progress_callback: Callable[[str], None] | None = None,
+        progress_tracker: ProgressTracker | None = None,
     ):
         """Initialize the PatternIndexer with GraphCodeBERT model.
 
@@ -113,6 +115,7 @@ class PatternIndexer:
             device_manager: Device manager for hardware acceleration (auto-created if None)
             enable_optimizations: Enable hardware-specific optimizations
             progress_callback: Optional callback to report initialization progress
+            progress_tracker: Optional progress tracker for enhanced progress indication
         """
         logger.info("=== PATTERN INDEXER INIT START ===")
         logger.info("Starting PatternIndexer initialization")
@@ -122,6 +125,7 @@ class PatternIndexer:
 
         # Store progress callback for reporting
         self.progress_callback = progress_callback
+        self.progress_tracker = progress_tracker
 
         # Helper function to report progress
         def report_progress(message: str) -> None:
@@ -286,7 +290,22 @@ class PatternIndexer:
 
             try:
                 logger.info("Calling self.model.to(self.device)...")
-                self.model.to(self.device)
+
+                # Use heartbeat progress for device transfer if tracker available
+                if self.progress_tracker:
+                    device_name = str(self.device).upper()
+                    heartbeat_message = (
+                        f"Moving model to {device_name} device (memory transfer)"
+                    )
+                    with self.progress_tracker.create_heartbeat_context(
+                        AnalysisPhase.ANALYZER_INIT,
+                        heartbeat_message,
+                        heartbeat_interval=2.0,
+                    ):
+                        self.model.to(self.device)
+                else:
+                    self.model.to(self.device)
+
                 logger.info("Model moved to device successfully!")
 
                 # Apply dtype if needed (after moving to device)
@@ -296,7 +315,19 @@ class PatternIndexer:
                 ):  # Only convert if different from default
                     logger.info(f"Converting model to dtype: {target_dtype}")
                     try:
-                        self.model = self.model.to(dtype=target_dtype)
+                        # Use heartbeat progress for dtype conversion if tracker available
+                        if self.progress_tracker:
+                            dtype_message = (
+                                f"Converting model precision to {target_dtype}"
+                            )
+                            with self.progress_tracker.create_heartbeat_context(
+                                AnalysisPhase.ANALYZER_INIT,
+                                dtype_message,
+                                heartbeat_interval=2.0,
+                            ):
+                                self.model = self.model.to(dtype=target_dtype)
+                        else:
+                            self.model = self.model.to(dtype=target_dtype)
                         logger.info("Model dtype conversion completed successfully")
                     except Exception as dtype_error:
                         logger.warning(f"Failed to convert model dtype: {dtype_error}")
@@ -450,7 +481,17 @@ class PatternIndexer:
                     )
                     logger.info("This is where segmentation faults typically occur!")
 
-                    result = load_func()
+                    # Use heartbeat progress for long-running operations if tracker available
+                    if self.progress_tracker:
+                        heartbeat_message = f"Loading {component_name} model (downloading from HuggingFace)"
+                        with self.progress_tracker.create_heartbeat_context(
+                            AnalysisPhase.ANALYZER_INIT,
+                            heartbeat_message,
+                            heartbeat_interval=3.0,
+                        ):
+                            result = load_func()
+                    else:
+                        result = load_func()
 
                     logger.info(f"SUCCESS: {component_name} loaded successfully!")
                     logger.info(f"Loaded {component_name} type: {type(result)}")

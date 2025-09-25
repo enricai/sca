@@ -37,10 +37,11 @@ from typing import Any
 import click
 from rich.console import Console
 from rich.panel import Panel
-from rich.progress import Progress, SpinnerColumn, TextColumn, TimeElapsedColumn, track
+from rich.progress import track
 from rich.table import Table
 
 from .hardware import DeviceManager, DeviceType
+from .progress import AnalysisPhase, ProgressConfig, ProgressManager
 from .scorers import EnhancedScorerConfig, MultiDimensionalScorer
 
 console = Console()
@@ -231,6 +232,17 @@ def cli(ctx: click.Context, verbose: bool, debug: bool) -> None:
     default="auto",
     help="Hardware device preference for AI model acceleration (auto, cpu, mps, cuda)",
 )
+@click.option(
+    "--no-progress",
+    is_flag=True,
+    help="Disable progress bars (useful for CI/CD environments)",
+)
+@click.option(
+    "--progress-backend",
+    type=click.Choice(["rich", "tqdm", "auto"]),
+    default="rich",
+    help="Progress bar backend to use",
+)
 @click.pass_context
 def analyze(
     ctx: click.Context,
@@ -251,6 +263,8 @@ def analyze(
     disable_pattern_indices: bool,
     max_recommendations: int,
     device: str,
+    no_progress: bool,
+    progress_backend: str,
 ) -> None:
     """Perform multi-dimensional analysis on a commit."""
     console.print(f"[bold blue]Analyzing commit: {commit_hash}[/bold blue]")
@@ -321,25 +335,62 @@ def analyze(
     )
     logger.info("EnhancedScorerConfig created successfully")
 
+    # Create progress manager based on configuration
+    from .progress import ProgressBackend
+
+    progress_config = ProgressConfig(
+        enabled=not no_progress,
+        backend=(
+            ProgressBackend(progress_backend)
+            if progress_backend != "auto"
+            else ProgressBackend.RICH
+        ),
+    )
+    progress_manager = ProgressManager(progress_config)
+
     try:
-        # Initialize DeviceManager for hardware acceleration
-        logger.info("=== DEVICE MANAGER INITIALIZATION ===")
-        device_preference = None if device == "auto" else DeviceType(device.lower())
-        logger.info(f"Device preference: {device_preference}")
+        # Start comprehensive progress tracking
+        with progress_manager.create_progress_context() as progress_tracker:
+            # Phase 1: Repository Setup
+            progress_tracker.start_phase(AnalysisPhase.REPOSITORY_SETUP)
+            progress_tracker.update_phase(
+                AnalysisPhase.REPOSITORY_SETUP, "Validating repository..."
+            )
+            logger.info("=== REPOSITORY SETUP ===")
+            progress_tracker.complete_phase(AnalysisPhase.REPOSITORY_SETUP)
 
-        # Run pre-analysis health check for MPS devices
-        should_continue, final_device = _run_pre_analysis_health_check(device, console)
-        if not should_continue:
-            console.print("[yellow]Analysis aborted by user[/yellow]")
-            sys.exit(0)
+            # Phase 2: Hardware Initialization
+            progress_tracker.start_phase(
+                AnalysisPhase.HARDWARE_INIT, "Hardware Acceleration Setup"
+            )
+            progress_tracker.update_phase(
+                AnalysisPhase.HARDWARE_INIT, "Checking device preferences..."
+            )
 
-        # Use the device choice from health check (may have changed to CPU)
-        device = final_device
-        device_preference = None if device == "auto" else DeviceType(device.lower())
+            logger.info("=== DEVICE MANAGER INITIALIZATION ===")
+            device_preference = None if device == "auto" else DeviceType(device.lower())
+            logger.info(f"Device preference: {device_preference}")
 
-        logger.info("Starting DeviceManager initialization...")
+            # Run pre-analysis health check for MPS devices
+            progress_tracker.update_phase(
+                AnalysisPhase.HARDWARE_INIT, "Running hardware health check..."
+            )
+            should_continue, final_device = _run_pre_analysis_health_check(
+                device, console
+            )
+            if not should_continue:
+                console.print("[yellow]Analysis aborted by user[/yellow]")
+                sys.exit(0)
 
-        with console.status("[bold green]Initializing hardware acceleration..."):
+            # Use the device choice from health check (may have changed to CPU)
+            device = final_device
+            device_preference = None if device == "auto" else DeviceType(device.lower())
+
+            progress_tracker.update_phase(
+                AnalysisPhase.HARDWARE_INIT, "Initializing device manager..."
+            )
+            logger.info("Starting DeviceManager initialization...")
+
             try:
                 device_manager = DeviceManager(prefer_device=device_preference)
             except Exception as e:
@@ -356,85 +407,106 @@ def analyze(
                     )
                 raise
 
-        logger.info("DeviceManager initialized successfully")
+            logger.info("DeviceManager initialized successfully")
 
-        # Display hardware information with enhanced status reporting
-        logger.info("=== HARDWARE INFORMATION ===")
-        hardware_info = device_manager.hardware_info
-        device_status = device_manager.get_device_status_report()
+            # Display hardware information
+            progress_tracker.update_phase(
+                AnalysisPhase.HARDWARE_INIT, "Gathering hardware information..."
+            )
+            logger.info("=== HARDWARE INFORMATION ===")
+            hardware_info = device_manager.hardware_info
+            device_status = device_manager.get_device_status_report()
 
-        logger.info(f"Device name: {hardware_info.device_name}")
-        logger.info(f"Device type: {hardware_info.device_type}")
-        logger.info(f"Platform: {hardware_info.platform}")
-        logger.info(f"Architecture: {hardware_info.architecture}")
-        logger.info(f"Memory GB: {hardware_info.memory_gb}")
-        logger.info(f"Apple Silicon: {hardware_info.is_apple_silicon}")
-        logger.info(f"Chip generation: {hardware_info.chip_generation}")
-        logger.info(f"Supports MPS: {hardware_info.supports_mps}")
-        logger.info(f"Supports CUDA: {hardware_info.supports_cuda}")
+            logger.info(f"Device name: {hardware_info.device_name}")
+            logger.info(f"Device type: {hardware_info.device_type}")
+            logger.info(f"Platform: {hardware_info.platform}")
+            logger.info(f"Architecture: {hardware_info.architecture}")
+            logger.info(f"Memory GB: {hardware_info.memory_gb}")
+            logger.info(f"Apple Silicon: {hardware_info.is_apple_silicon}")
+            logger.info(f"Chip generation: {hardware_info.chip_generation}")
+            logger.info(f"Supports MPS: {hardware_info.supports_mps}")
+            logger.info(f"Supports CUDA: {hardware_info.supports_cuda}")
 
-        # Enhanced user-facing device status display
-        device_icon = (
-            "⚡"
-            if hardware_info.device_type == DeviceType.MPS
-            else "🖥️" if hardware_info.device_type == DeviceType.CUDA else "💻"
-        )
-        console.print(
-            f"[dim]{device_icon} Using: {hardware_info.device_name} "
-            f"({hardware_info.memory_gb:.1f}GB memory)[/dim]"
-        )
-
-        # Display warnings prominently to users
-        if device_status["warnings"]:
-            for warning in device_status["warnings"]:
-                if warning["level"] == "warning":
-                    console.print(f"[yellow]⚠️  {warning['message']}[/yellow]")
-                    console.print(f"[dim]   Impact: {warning['impact']}[/dim]")
-                    console.print(f"[dim]   Suggestion: {warning['suggestion']}[/dim]")
-
-        # Display performance expectations
-        if device_status["performance_notes"]:
-            performance_note = device_status["performance_notes"][
-                0
-            ]  # Show primary note
-            console.print(f"[dim]📊 Performance: {performance_note}[/dim]")
-
-        # Initialize scorer with DeviceManager using progress tracking
-        logger.info("=== MULTIDIMENSIONAL SCORER INITIALIZATION ===")
-        logger.info("Starting MultiDimensionalScorer initialization...")
-
-        # Create progress bar for analyzer initialization
-        with Progress(
-            SpinnerColumn(),
-            TextColumn("[progress.description]{task.description}"),
-            TimeElapsedColumn(),
-            console=console,
-        ) as progress:
-            # Add main initialization task
-            init_task = progress.add_task(
-                "[bold green]Initializing analyzers...", total=None
+            # Enhanced user-facing device status display
+            device_icon = (
+                "⚡"
+                if hardware_info.device_type == DeviceType.MPS
+                else "🖥️" if hardware_info.device_type == DeviceType.CUDA else "💻"
+            )
+            console.print(
+                f"[dim]{device_icon} Using: {hardware_info.device_name} "
+                f"({hardware_info.memory_gb:.1f}GB memory)[/dim]"
             )
 
-            def progress_callback(message: str) -> None:
-                """Progress callback to update the task description."""
-                progress.update(init_task, description=f"[bold green]{message}")
-                logger.info(f"Progress: {message}")
+            # Display warnings prominently to users
+            if device_status["warnings"]:
+                for warning in device_status["warnings"]:
+                    if warning["level"] == "warning":
+                        console.print(f"[yellow]⚠️  {warning['message']}[/yellow]")
+                        console.print(f"[dim]   Impact: {warning['impact']}[/dim]")
+                        console.print(
+                            f"[dim]   Suggestion: {warning['suggestion']}[/dim]"
+                        )
+
+            # Display performance expectations
+            if device_status["performance_notes"]:
+                performance_note = device_status["performance_notes"][
+                    0
+                ]  # Show primary note
+                console.print(f"[dim]📊 Performance: {performance_note}[/dim]")
+
+            progress_tracker.complete_phase(AnalysisPhase.HARDWARE_INIT)
+
+            # Phase 3: Analyzer Initialization
+            progress_tracker.start_phase(
+                AnalysisPhase.ANALYZER_INIT, "Initializing Analysis Components"
+            )
+            logger.info("=== MULTIDIMENSIONAL SCORER INITIALIZATION ===")
+            logger.info("Starting MultiDimensionalScorer initialization...")
+
+            # Create nested progress callback for scorer initialization
+            scorer_progress_callback = progress_manager.create_nested_callback(
+                AnalysisPhase.ANALYZER_INIT.value, "Scorer: "
+            )
 
             scorer = MultiDimensionalScorer(
-                config, repo_path, device_manager, progress_callback=progress_callback
+                config,
+                repo_path,
+                device_manager,
+                progress_callback=scorer_progress_callback,
+                progress_tracker=progress_tracker,
             )
 
-        logger.info("MultiDimensionalScorer initialized successfully")
+            logger.info("MultiDimensionalScorer initialized successfully")
+            progress_tracker.complete_phase(AnalysisPhase.ANALYZER_INIT)
 
-        # Perform analysis
-        start_time = time.time()
+            # Phase 4: Analysis Execution
+            progress_tracker.start_phase(
+                AnalysisPhase.ANALYSIS, "Running Multi-Dimensional Analysis"
+            )
+            start_time = time.time()
 
-        results = scorer.analyze_commit(
-            commit_hash, progress_callback=progress_callback
-        )
+            # Create nested progress callback for analysis
+            analysis_progress_callback = progress_manager.create_nested_callback(
+                AnalysisPhase.ANALYSIS.value, "Analysis: "
+            )
 
-        analysis_time = time.time() - start_time
-        console.print(f"[green]Analysis completed in {analysis_time:.2f}s[/green]")
+            results = scorer.analyze_commit(
+                commit_hash, progress_callback=analysis_progress_callback
+            )
+
+            analysis_time = time.time() - start_time
+            progress_tracker.complete_phase(AnalysisPhase.ANALYSIS)
+
+            # Phase 5: Finalization
+            progress_tracker.start_phase(
+                AnalysisPhase.FINALIZATION, "Finalizing Results"
+            )
+            progress_tracker.update_phase(
+                AnalysisPhase.FINALIZATION, "Preparing output..."
+            )
+            console.print(f"[green]Analysis completed in {analysis_time:.2f}s[/green]")
+            progress_tracker.complete_phase(AnalysisPhase.FINALIZATION)
 
         # Display results
         _display_results(results, ctx.obj["verbose"])
@@ -486,6 +558,17 @@ def analyze(
     default="auto",
     help="Hardware device preference for AI model acceleration (auto, cpu, mps, cuda)",
 )
+@click.option(
+    "--no-progress",
+    is_flag=True,
+    help="Disable progress bars (useful for CI/CD environments)",
+)
+@click.option(
+    "--progress-backend",
+    type=click.Choice(["rich", "tqdm", "auto"]),
+    default="rich",
+    help="Progress bar backend to use",
+)
 @click.pass_context
 def compare(
     ctx: click.Context,
@@ -494,6 +577,8 @@ def compare(
     repo_path: str,
     output: str | None,
     device: str,
+    no_progress: bool,
+    progress_backend: str,
 ) -> None:
     """Compare multiple commits against a base implementation."""
     commits_to_compare = [c.strip() for c in compare_commits.split(",")]
