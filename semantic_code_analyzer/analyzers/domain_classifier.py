@@ -71,6 +71,17 @@ class DomainClassificationResult:
     secondary_domains: list[tuple[ArchitecturalDomain, float]]
 
 
+@dataclass
+class DomainDiagnostics:
+    """Detailed diagnostics about domain classification patterns."""
+
+    domain: ArchitecturalDomain
+    matched_patterns: list[str]
+    missing_patterns: list[str]
+    pattern_category: str  # 'path', 'import', or 'content'
+    score: float
+
+
 class DomainClassifier(BaseAnalyzer):
     """Classifies code changes by architectural domain.
 
@@ -324,10 +335,25 @@ class DomainClassifier(BaseAnalyzer):
                     r"import.*from\s+['\"]react['\"]",
                     r"import.*from\s+['\"]next/.*['\"]",
                     r"import.*from\s+['\"]@/components/.*['\"]",
-                    r"use client",
+                    r"['\"]use client['\"]",
                     r"import.*useState|useEffect|useCallback",
                     r"import.*from\s+['\"]styled-components['\"]",
                     r"import.*from\s+['\"]@emotion/.*['\"]",
+                    # React 18+ and modern patterns
+                    r"useDeferredValue|useTransition|useId",
+                    r"Suspense|ErrorBoundary|startTransition",
+                    r"import.*from\s+['\"]client-only['\"]",
+                    r"forwardRef|createPortal",
+                    # Next.js App Router specific
+                    r"import.*from\s+['\"]next/navigation['\"]",
+                    r"useRouter|useSearchParams|usePathname",
+                    # Modern CSS and styling
+                    r"import.*from\s+['\"]tailwindcss['\"]",
+                    r"className=|tw\.|clsx\(|cn\(",
+                    # State management
+                    r"import.*from\s+['\"]zustand['\"]",
+                    r"import.*from\s+['\"]jotai['\"]",
+                    r"import.*from\s+['\"]@tanstack/react-query['\"]",
                 ],
                 "weight": 0.8,
             },
@@ -340,6 +366,20 @@ class DomainClassifier(BaseAnalyzer):
                     r"import.*from\s+['\"]koa['\"]",
                     r"import.*from\s+['\"]node:.*['\"]",
                     r"import.*fs|path|crypto",
+                    # Next.js App Router API patterns
+                    r"['\"]use server['\"]",
+                    r"import.*from\s+['\"]server-only['\"]",
+                    r"cookies\(\)|headers\(\)",
+                    r"redirect\(|notFound\(\)",
+                    # Modern Node.js patterns
+                    r"import.*from\s+['\"]@vercel/.*['\"]",
+                    r"import.*from\s+['\"]@planetscale/.*['\"]",
+                    r"import.*from\s+['\"]@supabase/.*['\"]",
+                    # Authentication and middleware
+                    r"import.*from\s+['\"]next-auth.*['\"]",
+                    r"import.*from\s+['\"]@auth/.*['\"]",
+                    r"middleware\.(ts|js)",
+                    r"cors|helmet|morgan|ratelimit",
                 ],
                 "weight": 0.8,
             },
@@ -352,6 +392,18 @@ class DomainClassifier(BaseAnalyzer):
                     r"import.*from\s+['\"]sequelize['\"]",
                     r"import.*from\s+['\"]pg['\"]",
                     r"import.*from\s+['\"]mysql.*['\"]",
+                    # Modern database tools and ORMs
+                    r"import.*from\s+['\"]@prisma/client['\"]",
+                    r"import.*from\s+['\"]drizzle-kit['\"]",
+                    r"import.*from\s+['\"]kysely['\"]",
+                    r"import.*from\s+['\"]@planetscale/database['\"]",
+                    r"import.*from\s+['\"]@supabase/supabase-js['\"]",
+                    r"import.*from\s+['\"]redis['\"]",
+                    r"import.*from\s+['\"]ioredis['\"]",
+                    # Database connection and pooling
+                    r"import.*from\s+['\"]@vercel/postgres['\"]",
+                    r"import.*from\s+['\"]@neondatabase/serverless['\"]",
+                    r"PrismaClient|DrizzleClient|DatabaseClient",
                 ],
                 "weight": 0.9,
             },
@@ -363,6 +415,20 @@ class DomainClassifier(BaseAnalyzer):
                     r"import.*from\s+['\"]cypress['\"]",
                     r"import.*from\s+['\"]playwright['\"]",
                     r"describe|test|it|expect",
+                    # Modern testing frameworks and tools
+                    r"import.*from\s+['\"]@playwright/test['\"]",
+                    r"import.*from\s+['\"]@storybook/.*['\"]",
+                    r"import.*from\s+['\"]msw['\"]",  # Mock Service Worker
+                    r"import.*from\s+['\"]@faker-js/faker['\"]",
+                    r"import.*from\s+['\"]factory-girl['\"]",
+                    r"beforeEach|afterEach|beforeAll|afterAll",
+                    r"mock|spy|stub|vi\.mock",
+                    # React Testing Library specific
+                    r"render|screen\.|fireEvent|userEvent",
+                    r"waitFor|findBy|queryBy|getBy",
+                    # E2E testing patterns
+                    r"page\.|locator\.|goto\(|click\(",
+                    r"test\.describe|test\.beforeEach",
                 ],
                 "weight": 0.9,
             },
@@ -379,6 +445,26 @@ class DomainClassifier(BaseAnalyzer):
                     r"onClick=|onChange=|onSubmit=",
                     r"React\.FC|FC<",
                     r"useState|useEffect|useContext",
+                    # React 18+ patterns
+                    r"Suspense.*fallback=",
+                    r"startTransition\(|useDeferredValue\(",
+                    r"useId\(|useTransition\(",
+                    # Next.js App Router patterns
+                    r"params:|searchParams:",
+                    r"generateMetadata|generateStaticParams",
+                    r"layout\.tsx|page\.tsx|loading\.tsx",
+                    # Modern React patterns
+                    r"forwardRef<.*>|createPortal\(",
+                    r"memo\(.*\)|useCallback\(.*\)|useMemo\(",
+                    # Modern styling
+                    r"clsx\(|cn\(|tw\.|@apply",
+                    r"variants:|compoundVariants:",
+                    # Form handling
+                    r"useForm\(|register\(|handleSubmit",
+                    r"zodResolver|yupResolver",
+                    # State management
+                    r"useStore\(|atom\(|selector\(",
+                    r"create\(.*=>\s*\{",  # Zustand store
                 ],
                 "weight": 0.7,
             },
@@ -390,6 +476,22 @@ class DomainClassifier(BaseAnalyzer):
                     r"async\s+function.*handler",
                     r"middleware",
                     r"cors|helmet|morgan",
+                    # Next.js App Router API patterns
+                    r"NextRequest|NextResponse",
+                    r"cookies\(\)\.set|headers\(\)\.get",
+                    r"redirect\(|notFound\(\)",
+                    # Server actions
+                    r"['\"]use server['\"]",
+                    r"revalidatePath\(|revalidateTag\(",
+                    # Modern Node.js patterns
+                    r"process\.env\.|Bun\.|Deno\.",
+                    # Authentication patterns
+                    r"jwt\.sign|bcrypt\.|scrypt\.",
+                    r"getServerSession|auth\(\)",
+                    # Database operations in API context
+                    r"await\s+db\.|await\s+prisma\.",
+                    # Validation and error handling
+                    r"z\.|zod\.|validator\.",
                 ],
                 "weight": 0.8,
             },
@@ -400,6 +502,21 @@ class DomainClassifier(BaseAnalyzer):
                     r"schema\.|model\.|entity\.",
                     r"migration|migrate",
                     r"connection|connect|disconnect",
+                    # Modern ORM patterns
+                    r"\.query\(|\.execute\(|\.transaction\(",
+                    r"\.select\(\)|\.where\(\)|\.orderBy\(",
+                    r"\.join\(|\.leftJoin\(|\.innerJoin\(",
+                    r"@Entity\(|@Table\(|@Column\(",
+                    r"PrismaClient\(\)|DrizzleClient\(\)",
+                    # Database operations
+                    r"upsert\(|deleteMany\(|updateMany\(",
+                    r"aggregate\(|groupBy\(|count\(\)",
+                    # Schema definitions
+                    r"relations\(|references\(|primaryKey\(",
+                    r"varchar\(|integer\(|boolean\(|timestamp\(",
+                    # Migration patterns
+                    r"createTable\(|dropTable\(|alterTable\(",
+                    r"addColumn\(|dropColumn\(|addIndex\(",
                 ],
                 "weight": 0.9,
             },
@@ -410,6 +527,26 @@ class DomainClassifier(BaseAnalyzer):
                     r"beforeEach|afterEach|beforeAll|afterAll",
                     r"mock|spy|stub",
                     r"render\(|screen\.|fireEvent",
+                    # Modern testing patterns
+                    r"vi\.mock\(|vi\.spyOn\(|vi\.fn\(",  # Vitest
+                    r"waitFor\(|findBy|queryBy|getBy",
+                    r"userEvent\.|fireEvent\.",
+                    r"toHaveBeenCalled|toHaveBeenCalledWith",
+                    r"toBeInTheDocument\(|toHaveClass\(",
+                    # E2E testing
+                    r"page\.goto\(|page\.click\(|page\.fill\(",
+                    r"locator\(|getByRole\(|getByText\(",
+                    r"expect\(page\)\.|await page\.",
+                    # Component testing
+                    r"mount\(|shallow\(|render\(",
+                    r"wrapper\.find\(|wrapper\.prop\(",
+                    # API testing
+                    r"supertest\(|request\(.*\)\.",
+                    r"\.get\(|\.post\(|\.put\(|\.delete\(",
+                    # Mock patterns
+                    r"jest\.mock\(|jest\.spyOn\(",
+                    r"mockResolvedValue|mockRejectedValue",
+                    r"msw\.|setupServer\(|rest\.",
                 ],
                 "weight": 0.9,
             },
@@ -664,6 +801,206 @@ class DomainClassifier(BaseAnalyzer):
             )
 
         return recommendations
+
+    def get_classification_diagnostics(
+        self, file_path: str, content: str
+    ) -> dict[ArchitecturalDomain, list[DomainDiagnostics]]:
+        """Get detailed diagnostics about domain classification patterns.
+
+        Args:
+            file_path: Path to the file
+            content: Content of the file
+
+        Returns:
+            Dictionary mapping domains to their detailed diagnostics
+        """
+        diagnostics: dict[ArchitecturalDomain, list[DomainDiagnostics]] = {}
+
+        # Analyze different classification factors with diagnostics
+        for domain in ArchitecturalDomain:
+            domain_diagnostics = []
+
+            # Path pattern diagnostics
+            path_diag = self._get_path_pattern_diagnostics(file_path, domain)
+            if path_diag:
+                domain_diagnostics.append(path_diag)
+
+            # Import pattern diagnostics
+            import_diag = self._get_import_pattern_diagnostics(content, domain)
+            if import_diag:
+                domain_diagnostics.append(import_diag)
+
+            # Content pattern diagnostics
+            content_diag = self._get_content_pattern_diagnostics(content, domain)
+            if content_diag:
+                domain_diagnostics.append(content_diag)
+
+            if domain_diagnostics:
+                diagnostics[domain] = domain_diagnostics
+
+        return diagnostics
+
+    def _get_path_pattern_diagnostics(
+        self, file_path: str, domain: ArchitecturalDomain
+    ) -> DomainDiagnostics | None:
+        """Get path pattern diagnostics for a specific domain."""
+        if domain not in self.domain_patterns:
+            return None
+
+        config = self.domain_patterns[domain]
+        matched_patterns = []
+        missing_patterns = []
+
+        for pattern in config["path_patterns"]:
+            if re.match(pattern, file_path, re.IGNORECASE):
+                matched_patterns.append(
+                    self._get_human_readable_pattern(pattern, "path")
+                )
+            else:
+                missing_patterns.append(
+                    self._get_human_readable_pattern(pattern, "path")
+                )
+
+        score = config["weight"] if matched_patterns else 0.0
+
+        return DomainDiagnostics(
+            domain=domain,
+            matched_patterns=matched_patterns,
+            missing_patterns=missing_patterns[:5],  # Limit for readability
+            pattern_category="path",
+            score=score,
+        )
+
+    def _get_import_pattern_diagnostics(
+        self, content: str, domain: ArchitecturalDomain
+    ) -> DomainDiagnostics | None:
+        """Get import pattern diagnostics for a specific domain."""
+        if domain not in self.import_patterns:
+            return None
+
+        config = self.import_patterns[domain]
+        matched_patterns = []
+        missing_patterns = []
+
+        for pattern in config["patterns"]:
+            if re.search(pattern, content, re.MULTILINE | re.IGNORECASE):
+                matched_patterns.append(
+                    self._get_human_readable_pattern(pattern, "import")
+                )
+            else:
+                missing_patterns.append(
+                    self._get_human_readable_pattern(pattern, "import")
+                )
+
+        pattern_match_count = len(matched_patterns)
+        score = (
+            min(1.0, (pattern_match_count / len(config["patterns"])) * config["weight"])
+            if pattern_match_count > 0
+            else 0.0
+        )
+
+        return DomainDiagnostics(
+            domain=domain,
+            matched_patterns=matched_patterns,
+            missing_patterns=missing_patterns[:5],  # Limit for readability
+            pattern_category="import",
+            score=score,
+        )
+
+    def _get_content_pattern_diagnostics(
+        self, content: str, domain: ArchitecturalDomain
+    ) -> DomainDiagnostics | None:
+        """Get content pattern diagnostics for a specific domain."""
+        if domain not in self.content_patterns:
+            return None
+
+        config = self.content_patterns[domain]
+        matched_patterns = []
+        missing_patterns = []
+
+        for pattern in config["patterns"]:
+            matches = len(re.findall(pattern, content, re.MULTILINE | re.IGNORECASE))
+            if matches > 0:
+                matched_patterns.append(
+                    self._get_human_readable_pattern(pattern, "content")
+                )
+            else:
+                missing_patterns.append(
+                    self._get_human_readable_pattern(pattern, "content")
+                )
+
+        pattern_match_count = sum(
+            min(5, len(re.findall(pattern, content, re.MULTILINE | re.IGNORECASE)))
+            for pattern in config["patterns"]
+        )
+        score = (
+            min(
+                1.0,
+                (pattern_match_count / (len(config["patterns"]) * 3))
+                * config["weight"],
+            )
+            if pattern_match_count > 0
+            else 0.0
+        )
+
+        return DomainDiagnostics(
+            domain=domain,
+            matched_patterns=matched_patterns,
+            missing_patterns=missing_patterns[:5],  # Limit for readability
+            pattern_category="content",
+            score=score,
+        )
+
+    def _get_human_readable_pattern(self, pattern: str, category: str) -> str:
+        """Convert regex patterns to human-readable descriptions."""
+        # Frontend patterns
+        if category == "import":
+            pattern_map = {
+                r"import.*from\s+['\"]react['\"]": "React imports",
+                r"import.*useState|useEffect|useCallback": "React hooks (useState, useEffect, useCallback)",
+                r"['\"]use client['\"]": "'use client' directive",
+                r"import.*from\s+['\"]next/.*['\"]": "Next.js imports",
+                r"import.*from\s+['\"]styled-components['\"]": "Styled Components",
+                r"import.*from\s+['\"]next/server['\"]": "Next.js Server imports",
+                r"NextRequest|NextResponse": "Next.js API request/response types",
+                r"import.*from\s+['\"]express['\"]": "Express.js framework",
+                r"['\"]use server['\"]": "'use server' directive",
+                r"import.*from\s+['\"]prisma/.*['\"]": "Prisma ORM",
+                r"import.*from\s+['\"]drizzle-orm.*['\"]": "Drizzle ORM",
+                r"import.*from\s+['\"]@testing-library/.*['\"]": "Testing Library",
+                r"describe|test|it|expect": "Test framework functions",
+                r"import.*from\s+['\"]jest['\"]": "Jest testing framework",
+            }
+        elif category == "content":
+            pattern_map = {
+                r"return\s*\(\s*<": "JSX return statements",
+                r"<\w+.*>": "JSX elements",
+                r"className=": "CSS class assignments",
+                r"onClick=|onChange=|onSubmit=": "Event handlers",
+                r"useState|useEffect|useContext": "React hooks usage",
+                r"export\s+async\s+function\s+(GET|POST|PUT|DELETE|PATCH)": "API route handlers",
+                r"req\.|res\.|request\.|response\.": "Request/response handling",
+                r"\.json\(\)|\.status\(\)": "JSON responses and status codes",
+                r"SELECT|INSERT|UPDATE|DELETE|CREATE TABLE": "SQL statements",
+                r"\.findMany\(\)|\.findUnique\(\)|\.create\(\)|\.update\(\)": "ORM operations",
+                r"describe\(|test\(|it\(": "Test suite structure",
+                r"expect\(.*\)\.(toBe|toEqual|toContain)": "Test assertions",
+                r"mock|spy|stub": "Test mocking",
+            }
+        elif category == "path":
+            pattern_map = {
+                r"src/components/.*\.(tsx?|jsx?)$": "React components directory",
+                r"src/pages/.*\.(tsx?|jsx?)$": "Next.js pages directory",
+                r"src/app/api/.*\.ts$": "Next.js API routes",
+                r".*\.test\.(ts|tsx|js|jsx|py)$": "Test files",
+                r".*\.spec\.(ts|tsx|js|jsx|py)$": "Spec files",
+                r".*migrations?/.*\.(sql|ts|js|py)$": "Database migrations",
+                r".*models?/.*\.(ts|js|py)$": "Data models",
+            }
+        else:
+            pattern_map = {}
+
+        return pattern_map.get(pattern, pattern)
 
     def _get_supported_extensions(self) -> set[str]:
         """Return the file extensions this analyzer supports.

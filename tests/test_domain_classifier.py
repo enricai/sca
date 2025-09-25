@@ -324,3 +324,200 @@ test('component renders', () => {
         config = {"test_setting": True}
         classifier = DomainClassifier(config)
         assert classifier.config == config
+
+    def test_get_classification_diagnostics_frontend(
+        self, classifier: DomainClassifier
+    ) -> None:
+        """Test diagnostic generation for frontend files."""
+        from semantic_code_analyzer.analyzers.domain_classifier import (
+            ArchitecturalDomain,
+        )
+
+        file_path = "src/components/Button.tsx"
+        content = """
+import React, { useState } from 'react';
+import { styled } from 'styled-components';
+
+const Button = () => {
+    const [count, setCount] = useState(0);
+    return <button onClick={() => setCount(count + 1)}>{count}</button>;
+};
+
+export default Button;
+"""
+
+        diagnostics = classifier.get_classification_diagnostics(file_path, content)
+
+        # Should have diagnostics for multiple domains
+        assert len(diagnostics) > 0
+
+        # Frontend should have strong matches
+        if ArchitecturalDomain.FRONTEND in diagnostics:
+            frontend_diag = diagnostics[ArchitecturalDomain.FRONTEND]
+            # Should have multiple diagnostic categories
+            categories = {diag.pattern_category for diag in frontend_diag}
+            assert "import" in categories or "content" in categories
+
+            # Should have some matched patterns
+            total_matches = sum(len(diag.matched_patterns) for diag in frontend_diag)
+            assert total_matches > 0
+
+    def test_get_classification_diagnostics_backend(
+        self, classifier: DomainClassifier
+    ) -> None:
+        """Test diagnostic generation for backend files."""
+        from semantic_code_analyzer.analyzers.domain_classifier import (
+            ArchitecturalDomain,
+        )
+
+        file_path = "src/app/api/users/route.ts"
+        content = """
+import { NextRequest, NextResponse } from 'next/server';
+
+export async function GET(request: NextRequest) {
+    try {
+        const data = await fetchUsers();
+        return NextResponse.json(data);
+    } catch (error) {
+        return NextResponse.json({ error: 'Failed' }, { status: 500 });
+    }
+}
+
+export async function POST(request: NextRequest) {
+    const body = await request.json();
+    return NextResponse.json(body);
+}
+"""
+
+        diagnostics = classifier.get_classification_diagnostics(file_path, content)
+
+        assert len(diagnostics) > 0
+
+        # Backend should have strong matches
+        if ArchitecturalDomain.BACKEND in diagnostics:
+            backend_diag = diagnostics[ArchitecturalDomain.BACKEND]
+            # Should have diagnostic categories
+            categories = {diag.pattern_category for diag in backend_diag}
+            assert len(categories) > 0
+
+            # Should have some matched patterns for backend
+            total_matches = sum(len(diag.matched_patterns) for diag in backend_diag)
+            assert total_matches > 0
+
+    def test_get_classification_diagnostics_testing(
+        self, classifier: DomainClassifier
+    ) -> None:
+        """Test diagnostic generation for testing files."""
+        from semantic_code_analyzer.analyzers.domain_classifier import (
+            ArchitecturalDomain,
+        )
+
+        file_path = "tests/components/Button.test.tsx"
+        content = """
+import { render, screen, fireEvent } from '@testing-library/react';
+import { expect, test, describe } from '@jest/globals';
+import Button from '../Button';
+
+describe('Button Component', () => {
+    test('renders button with text', () => {
+        render(<Button>Click me</Button>);
+        expect(screen.getByRole('button')).toBeInTheDocument();
+    });
+
+    test('handles click events', () => {
+        const mockClick = jest.fn();
+        render(<Button onClick={mockClick}>Click</Button>);
+        fireEvent.click(screen.getByRole('button'));
+        expect(mockClick).toHaveBeenCalled();
+    });
+});
+"""
+
+        diagnostics = classifier.get_classification_diagnostics(file_path, content)
+
+        assert len(diagnostics) > 0
+
+        # Testing should have strong matches
+        if ArchitecturalDomain.TESTING in diagnostics:
+            testing_diag = diagnostics[ArchitecturalDomain.TESTING]
+            categories = {diag.pattern_category for diag in testing_diag}
+            assert len(categories) > 0
+
+            # Should have matched testing patterns
+            total_matches = sum(len(diag.matched_patterns) for diag in testing_diag)
+            assert total_matches > 0
+
+    def test_human_readable_pattern_conversion(
+        self, classifier: DomainClassifier
+    ) -> None:
+        """Test conversion of regex patterns to human-readable descriptions."""
+        # Test import patterns
+        react_pattern = r"import.*from\s+['\"]react['\"]"
+        readable = classifier._get_human_readable_pattern(react_pattern, "import")
+        assert readable == "React imports"
+
+        # Test content patterns
+        jsx_pattern = r"return\s*\(\s*<"
+        readable = classifier._get_human_readable_pattern(jsx_pattern, "content")
+        assert readable == "JSX return statements"
+
+        # Test path patterns
+        component_pattern = r"src/components/.*\.(tsx?|jsx?)$"
+        readable = classifier._get_human_readable_pattern(component_pattern, "path")
+        assert readable == "React components directory"
+
+        # Test unknown pattern fallback
+        unknown_pattern = r"unknown.*pattern"
+        readable = classifier._get_human_readable_pattern(unknown_pattern, "import")
+        assert readable == unknown_pattern  # Should return original pattern
+
+    def test_diagnostics_missing_patterns_identified(
+        self, classifier: DomainClassifier
+    ) -> None:
+        """Test that diagnostics correctly identify missing patterns."""
+        from semantic_code_analyzer.analyzers.domain_classifier import (
+            ArchitecturalDomain,
+        )
+
+        # Test file that should be frontend but is missing key frontend patterns
+        file_path = "src/components/Component.tsx"
+        content = """
+// Basic TypeScript file with minimal React patterns
+const Component = () => {
+    return "Hello World";
+};
+export default Component;
+"""
+
+        diagnostics = classifier.get_classification_diagnostics(file_path, content)
+
+        # Should have diagnostics for frontend domain
+        if ArchitecturalDomain.FRONTEND in diagnostics:
+            frontend_diag = diagnostics[ArchitecturalDomain.FRONTEND]
+
+            # Should identify missing patterns
+            for diag in frontend_diag:
+                if diag.pattern_category in ["import", "content"]:
+                    assert len(diag.missing_patterns) > 0
+                    # Should have specific missing patterns like React imports
+                    has_react_missing = any(
+                        "react" in pattern.lower() for pattern in diag.missing_patterns
+                    )
+                    # At least one diagnostic category should note missing React patterns
+                    if diag.pattern_category == "import":
+                        assert has_react_missing or len(diag.missing_patterns) > 0
+
+    def test_diagnostics_empty_file(self, classifier: DomainClassifier) -> None:
+        """Test diagnostics behavior with empty or minimal file content."""
+        file_path = "unknown.js"
+        content = ""
+
+        diagnostics = classifier.get_classification_diagnostics(file_path, content)
+
+        # Should still generate diagnostics even for empty files
+        assert isinstance(diagnostics, dict)
+        # All domains should have mostly missing patterns
+        for _domain, diag_list in diagnostics.items():
+            for diag in diag_list:
+                # Empty file should have many missing patterns
+                assert len(diag.missing_patterns) >= len(diag.matched_patterns)

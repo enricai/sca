@@ -308,6 +308,9 @@ export default Button;
         analysis_result = Mock()
         analysis_result.domain_classification.domain = ArchitecturalDomain.FRONTEND
         analysis_result.domain_classification.confidence = 0.4  # Low confidence
+        analysis_result.domain_classification.classification_factors = {
+            "combined_scores": {"frontend": 0.4, "backend": 0.2}
+        }
         analysis_result.adherence_score.overall_adherence = 0.3  # Low adherence
         analysis_result.adherence_score.similar_patterns_count = 0  # No patterns
         analysis_result.improvement_suggestions = [
@@ -417,3 +420,218 @@ export default Button;
         assert analyzer.similarity_threshold == 0.7
         assert analyzer.domain_confidence_threshold == 0.8
         assert analyzer.max_similar_patterns == 3
+
+    def test_enhanced_domain_recommendation_generation(
+        self, analyzer: DomainAwareAdherenceAnalyzer, mock_dependencies: Any
+    ) -> None:
+        """Test enhanced domain recommendation generation with detailed diagnostics."""
+        from semantic_code_analyzer.analyzers.base_analyzer import Severity
+        from semantic_code_analyzer.analyzers.domain_classifier import (
+            ArchitecturalDomain,
+        )
+
+        # Create a low-confidence classification result
+        classification = Mock()
+        classification.domain = ArchitecturalDomain.FRONTEND
+        classification.confidence = (
+            0.4  # Low confidence to trigger enhanced recommendation
+        )
+        classification.classification_factors = {
+            "combined_scores": {
+                "frontend": 0.4,
+                "backend": 0.3,
+                "testing": 0.1,
+            }
+        }
+
+        # Mock the domain classifier's get_classification_diagnostics method
+        mock_classifier = mock_dependencies["classifier"]
+        mock_classifier.get_classification_diagnostics.return_value = {}
+
+        recommendation = analyzer._generate_enhanced_domain_recommendation(
+            "src/components/UserProfile.tsx", classification, Severity.WARNING
+        )
+
+        assert recommendation.severity == Severity.WARNING
+        assert recommendation.category == "domain_classification"
+        assert "Domain classification" in recommendation.message
+        assert "UserProfile.tsx" in recommendation.message
+        assert "(0.40 confidence)" in recommendation.message
+        assert "Evaluated domains:" in recommendation.message
+        assert recommendation.rule_id == "UNCLEAR_DOMAIN_ENHANCED"
+        assert recommendation.suggested_fix is not None
+
+    def test_domain_specific_improvements_frontend(
+        self, analyzer: DomainAwareAdherenceAnalyzer
+    ) -> None:
+        """Test domain-specific improvements for frontend files."""
+        from semantic_code_analyzer.analyzers.domain_classifier import (
+            ArchitecturalDomain,
+            DomainDiagnostics,
+        )
+
+        classification = Mock()
+        classification.domain = ArchitecturalDomain.FRONTEND
+        classification.classification_factors = {
+            "combined_scores": {"frontend": 0.8, "backend": 0.2}
+        }
+        diagnostics: dict[ArchitecturalDomain, list[DomainDiagnostics]] = {}
+
+        # Test React component file
+        improvements = analyzer._generate_domain_specific_improvements(
+            "src/components/Button.tsx", classification, diagnostics
+        )
+
+        assert len(improvements) > 0
+        # Check that we get some domain-specific improvements
+        assert any("React" in improvement for improvement in improvements)
+        assert any("component" in improvement.lower() for improvement in improvements)
+
+        # Test page file
+        improvements = analyzer._generate_domain_specific_improvements(
+            "src/pages/HomePage.tsx", classification, diagnostics
+        )
+
+        assert len(improvements) > 0
+        assert any("pages" in improvement for improvement in improvements)
+
+    def test_domain_specific_improvements_backend(
+        self, analyzer: DomainAwareAdherenceAnalyzer
+    ) -> None:
+        """Test domain-specific improvements for backend files."""
+        from semantic_code_analyzer.analyzers.domain_classifier import (
+            ArchitecturalDomain,
+            DomainDiagnostics,
+        )
+
+        classification = Mock()
+        classification.domain = ArchitecturalDomain.BACKEND
+        classification.classification_factors = {
+            "combined_scores": {"backend": 0.8, "frontend": 0.2}
+        }
+        diagnostics: dict[ArchitecturalDomain, list[DomainDiagnostics]] = {}
+
+        # Test API route file
+        improvements = analyzer._generate_domain_specific_improvements(
+            "src/app/api/users/route.ts", classification, diagnostics
+        )
+
+        assert len(improvements) > 0
+        # Check that we get some backend-specific improvements
+        assert any(
+            "api" in improvement.lower()
+            or "backend" in improvement.lower()
+            or "server" in improvement.lower()
+            for improvement in improvements
+        )
+
+    def test_domain_specific_improvements_unknown(
+        self, analyzer: DomainAwareAdherenceAnalyzer
+    ) -> None:
+        """Test domain-specific improvements for unknown domain files."""
+        from semantic_code_analyzer.analyzers.domain_classifier import (
+            ArchitecturalDomain,
+            DomainDiagnostics,
+        )
+
+        classification = Mock()
+        classification.domain = ArchitecturalDomain.UNKNOWN
+        classification.classification_factors = {
+            "combined_scores": {"unknown": 0.5, "frontend": 0.3}
+        }
+        diagnostics: dict[ArchitecturalDomain, list[DomainDiagnostics]] = {}
+
+        improvements = analyzer._generate_domain_specific_improvements(
+            "mystery_file.js", classification, diagnostics
+        )
+
+        assert len(improvements) > 0
+        assert any("splitting file" in improvement for improvement in improvements)
+        assert any("domain indicators" in improvement for improvement in improvements)
+
+    def test_missing_patterns_summary(
+        self, analyzer: DomainAwareAdherenceAnalyzer
+    ) -> None:
+        """Test missing patterns summary generation."""
+        from semantic_code_analyzer.analyzers.domain_classifier import (
+            ArchitecturalDomain,
+            DomainDiagnostics,
+        )
+
+        # Create mock diagnostics
+        diagnostics = {
+            ArchitecturalDomain.FRONTEND: [
+                DomainDiagnostics(
+                    domain=ArchitecturalDomain.FRONTEND,
+                    matched_patterns=["JSX elements"],
+                    missing_patterns=[
+                        "React imports",
+                        "React hooks usage",
+                        "Event handlers",
+                    ],
+                    pattern_category="import",
+                    score=0.3,
+                ),
+                DomainDiagnostics(
+                    domain=ArchitecturalDomain.FRONTEND,
+                    matched_patterns=[],
+                    missing_patterns=["useState usage", "Component structure"],
+                    pattern_category="content",
+                    score=0.1,
+                ),
+            ]
+        }
+
+        summary = analyzer._get_missing_patterns_summary(
+            diagnostics, ArchitecturalDomain.FRONTEND
+        )
+
+        assert len(summary) > 0
+        assert "React imports" in summary or "useState usage" in summary
+        # Should limit to 3 patterns max
+        pattern_count = summary.count(",") + 1 if summary else 0
+        assert pattern_count <= 3
+
+    def test_domain_enum_by_name(self, analyzer: DomainAwareAdherenceAnalyzer) -> None:
+        """Test domain enum retrieval by name."""
+        from semantic_code_analyzer.analyzers.domain_classifier import (
+            ArchitecturalDomain,
+        )
+
+        assert (
+            analyzer._get_domain_enum_by_name("frontend")
+            == ArchitecturalDomain.FRONTEND
+        )
+        assert (
+            analyzer._get_domain_enum_by_name("backend") == ArchitecturalDomain.BACKEND
+        )
+        assert (
+            analyzer._get_domain_enum_by_name("testing") == ArchitecturalDomain.TESTING
+        )
+        assert (
+            analyzer._get_domain_enum_by_name("invalid") == ArchitecturalDomain.UNKNOWN
+        )
+
+    def test_enhanced_recommendation_with_file_content_error(
+        self, analyzer: DomainAwareAdherenceAnalyzer
+    ) -> None:
+        """Test enhanced recommendation handles file reading errors gracefully."""
+        from semantic_code_analyzer.analyzers.base_analyzer import Severity
+        from semantic_code_analyzer.analyzers.domain_classifier import (
+            ArchitecturalDomain,
+        )
+
+        classification = Mock()
+        classification.domain = ArchitecturalDomain.FRONTEND
+        classification.confidence = 0.4
+        classification.classification_factors = {"combined_scores": {"frontend": 0.4}}
+
+        # Test with non-existent file path
+        recommendation = analyzer._generate_enhanced_domain_recommendation(
+            "/non/existent/file.tsx", classification, Severity.WARNING
+        )
+
+        # Should handle the error gracefully and still generate recommendation
+        assert recommendation is not None
+        assert recommendation.severity == Severity.WARNING
+        assert "Domain classification" in recommendation.message

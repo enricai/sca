@@ -56,6 +56,7 @@ from .domain_classifier import (
     ArchitecturalDomain,
     DomainClassificationResult,
     DomainClassifier,
+    DomainDiagnostics,
 )
 
 logger = logging.getLogger(__name__)
@@ -107,8 +108,7 @@ class DomainAwareAdherenceAnalyzer(BaseAnalyzer):
             device_manager: DeviceManager for hardware acceleration (optional).
             progress_callback: Optional callback to report initialization progress.
         """
-        logger.info("=== DOMAIN ADHERENCE ANALYZER INIT ===")
-        logger.info("Starting DomainAwareAdherenceAnalyzer initialization")
+        logger.debug("Starting DomainAwareAdherenceAnalyzer initialization")
 
         # Store progress callback for reporting
         self.progress_callback = progress_callback
@@ -121,59 +121,43 @@ class DomainAwareAdherenceAnalyzer(BaseAnalyzer):
 
         report_progress("Initializing base analyzer...")
         try:
-            logger.info("Calling super().__init__(config)...")
             super().__init__(config)
-            logger.info("Parent BaseAnalyzer initialized successfully")
         except Exception as e:
             logger.error(f"Failed to initialize parent BaseAnalyzer: {e}")
             raise
 
         # Initialize components
         report_progress("Initializing domain classifier...")
-        logger.info("Initializing DomainClassifier...")
         try:
             self.domain_classifier = DomainClassifier(config)
-            logger.info("DomainClassifier initialized successfully")
         except Exception as e:
             logger.error(f"Failed to initialize DomainClassifier: {e}")
             raise
 
         # Handle config safely
         config = config or {}
-        logger.info(f"Using config: {config}")
 
         # Initialize pattern indexer if dependencies are available
         report_progress("Checking ML model dependencies...")
-        logger.info("Checking PatternIndexer dependencies...")
         if PatternIndexer is not None:
             report_progress("Loading GraphCodeBERT model (this may take a while)...")
-            logger.info("PatternIndexer dependencies available - initializing...")
-            logger.info("WARNING: This is where the segfault likely occurs!")
 
             model_name = config.get("model_name", "microsoft/graphcodebert-base")
             cache_dir = config.get("cache_dir")
-            logger.info(f"Model name: {model_name}")
-            logger.info(f"Cache dir: {cache_dir}")
-            logger.info(f"Device manager provided: {device_manager is not None}")
 
             def pattern_indexer_progress_callback(message: str) -> None:
                 """Nested progress callback for pattern indexer."""
                 report_progress(f"Model loading: {message}")
 
             try:
-                logger.info(
-                    "Creating PatternIndexer - this may load heavy ML models..."
-                )
                 self.pattern_indexer = PatternIndexer(
                     model_name=model_name,
                     cache_dir=cache_dir,
                     device_manager=device_manager,
                     progress_callback=pattern_indexer_progress_callback,
                 )
-                logger.info("PatternIndexer initialized successfully!")
             except Exception as e:
-                logger.error(f"CRITICAL: PatternIndexer initialization failed: {e}")
-                logger.exception("Full traceback for PatternIndexer failure:")
+                logger.error(f"PatternIndexer initialization failed: {e}")
                 raise
         else:
             report_progress(
@@ -186,26 +170,17 @@ class DomainAwareAdherenceAnalyzer(BaseAnalyzer):
 
         # Configuration parameters
         report_progress("Finalizing analyzer configuration...")
-        logger.info("Setting configuration parameters...")
-        self.similarity_threshold = config.get("similarity_threshold", 0.3)
+        self.similarity_threshold = config.get("similarity_threshold", 0.4)
         self.min_patterns_for_analysis = config.get("min_patterns_for_analysis", 3)
-        self.max_similar_patterns = config.get("max_similar_patterns", 10)
+        self.max_similar_patterns = config.get("max_similar_patterns", 15)
         self.domain_confidence_threshold = config.get(
-            "domain_confidence_threshold", 0.6
+            "domain_confidence_threshold", 0.8
         )
-        logger.info(f"Similarity threshold: {self.similarity_threshold}")
-        logger.info(f"Min patterns for analysis: {self.min_patterns_for_analysis}")
-        logger.info(f"Max similar patterns: {self.max_similar_patterns}")
-        logger.info(f"Domain confidence threshold: {self.domain_confidence_threshold}")
 
         # Track if indices have been built
         self._indices_built: set[str] = set()
 
         report_progress("Domain adherence analyzer ready!")
-        logger.info("=== DOMAIN ADHERENCE ANALYZER INITIALIZATION COMPLETE ===")
-
-        logger.info("=== DOMAIN ADHERENCE ANALYZER INIT COMPLETE ===")
-        logger.info("DomainAwareAdherenceAnalyzer initialized successfully!")
 
     def get_analyzer_name(self) -> str:
         """Return the name identifier for this analyzer.
@@ -436,12 +411,22 @@ class DomainAwareAdherenceAnalyzer(BaseAnalyzer):
             pattern_similarity = 0.0
             max_similarity = 0.0
 
-        # Domain adherence calculation
+        # Enhanced domain adherence calculation
         if domain_classification.domain == ArchitecturalDomain.UNKNOWN:
-            domain_adherence = 0.3  # Neutral score for unknown domains
+            # Improved handling for unknown domains - less punitive
+            if pattern_similarity > 0.5:
+                domain_adherence = 0.6  # Good patterns even if domain unclear
+            elif pattern_similarity > 0.3:
+                domain_adherence = 0.5  # Moderate patterns
+            else:
+                domain_adherence = 0.4  # Neutral fallback
         else:
-            # Weight by domain confidence and pattern similarity
-            domain_adherence = (domain_match_quality * 0.6) + (pattern_similarity * 0.4)
+            # Enhanced weight by domain confidence and pattern similarity
+            domain_adherence = (domain_match_quality * 0.5) + (pattern_similarity * 0.5)
+
+            # Boost score for well-classified domains with good patterns
+            if domain_match_quality > 0.8 and pattern_similarity > 0.6:
+                domain_adherence = min(1.0, domain_adherence * 1.1)
 
         # Overall adherence combines multiple factors
         overall_adherence = self._calculate_weighted_adherence(
@@ -468,7 +453,7 @@ class DomainAwareAdherenceAnalyzer(BaseAnalyzer):
     def _calculate_weighted_adherence(
         self, domain_quality: float, pattern_similarity: float, pattern_count: int
     ) -> float:
-        """Calculate weighted overall adherence score.
+        """Calculate improved weighted overall adherence score.
 
         Args:
             domain_quality: Quality of domain classification
@@ -478,20 +463,35 @@ class DomainAwareAdherenceAnalyzer(BaseAnalyzer):
         Returns:
             Overall adherence score (0.0 to 1.0)
         """
-        # Base weights
-        domain_weight = 0.3
-        similarity_weight = 0.5
-        coverage_weight = 0.2
+        # Enhanced base score for better starting point
+        base_score = 0.5
 
-        # Coverage bonus based on number of patterns
-        coverage_score = min(1.0, pattern_count / 10.0)
+        # Adjusted weights for better balance
+        domain_weight = 0.25
+        similarity_weight = 0.6  # Higher weight on actual pattern similarity
+        coverage_weight = 0.15
 
-        # Weighted combination
+        # Enhanced coverage bonus with better scaling
+        coverage_score = min(1.0, pattern_count / 8.0)
+
+        # Weighted combination with base score
         overall_score = (
-            domain_quality * domain_weight
-            + pattern_similarity * similarity_weight
-            + coverage_score * coverage_weight
+            base_score
+            + (
+                domain_quality * domain_weight
+                + pattern_similarity * similarity_weight
+                + coverage_score * coverage_weight
+            )
+            * 0.5
         )
+
+        # Additional bonuses for high-quality classifications
+        if domain_quality > 0.8:
+            overall_score += 0.05
+        if pattern_similarity > 0.7:
+            overall_score += 0.05
+        if pattern_count >= 5:
+            overall_score += 0.03
 
         return max(0.0, min(1.0, overall_score))
 
@@ -568,40 +568,53 @@ class DomainAwareAdherenceAnalyzer(BaseAnalyzer):
         """
         recommendations = []
 
-        # Low overall adherence
-        if analysis.adherence_score.overall_adherence < 0.5:
+        # Enhanced adherence recommendations with better thresholds
+        if analysis.adherence_score.overall_adherence < 0.4:
+            # Only trigger error for very low scores
             severity = (
                 Severity.ERROR
-                if analysis.adherence_score.overall_adherence < 0.3
+                if analysis.adherence_score.overall_adherence < 0.25
                 else Severity.WARNING
             )
+
+            # Provide more specific guidance
+            domain_name = analysis.domain_classification.domain.value
+            if domain_name == "unknown":
+                message = f"Code patterns unclear - consider improving domain-specific implementation ({analysis.adherence_score.overall_adherence:.2f})"
+                suggested_fix = "Add domain-specific imports, naming conventions, or move to appropriate directory structure"
+            else:
+                message = f"Low adherence to {domain_name} domain patterns ({analysis.adherence_score.overall_adherence:.2f})"
+                suggested_fix = f"Review similar {domain_name} patterns in the codebase and align implementation"
 
             recommendations.append(
                 Recommendation(
                     severity=severity,
                     category="domain_adherence",
-                    message=f"Low adherence to {analysis.domain_classification.domain.value} domain patterns "
-                    f"({analysis.adherence_score.overall_adherence:.2f})",
+                    message=message,
                     file_path=file_path,
                     line_number=None,
-                    suggested_fix="Review similar patterns in the codebase and align implementation",
+                    suggested_fix=suggested_fix,
                     rule_id="LOW_DOMAIN_ADHERENCE",
                 )
             )
 
-        # Poor domain classification
-        if analysis.domain_classification.confidence < self.domain_confidence_threshold:
-            recommendations.append(
-                Recommendation(
-                    severity=Severity.WARNING,
-                    category="domain_classification",
-                    message=f"Unclear domain classification ({analysis.domain_classification.confidence:.2f} confidence)",
-                    file_path=file_path,
-                    line_number=None,
-                    suggested_fix="Add domain-specific patterns or move to appropriate directory",
-                    rule_id="UNCLEAR_DOMAIN",
-                )
+        # Enhanced domain classification recommendations with detailed diagnostics
+        # Use more nuanced thresholds based on confidence levels
+        if (
+            analysis.domain_classification.confidence < 0.6
+        ):  # Lowered threshold to catch more cases
+            if analysis.domain_classification.confidence < 0.3:
+                severity = Severity.ERROR  # Very low confidence needs attention
+            elif analysis.domain_classification.confidence < 0.5:
+                severity = Severity.WARNING  # Low confidence is concerning
+            else:
+                severity = Severity.INFO  # Moderate confidence is informational
+
+            # Get detailed diagnostics for enhanced feedback
+            enhanced_recommendation = self._generate_enhanced_domain_recommendation(
+                file_path, analysis.domain_classification, severity
             )
+            recommendations.append(enhanced_recommendation)
 
         # No similar patterns found
         if analysis.adherence_score.similar_patterns_count == 0:
@@ -695,6 +708,402 @@ class DomainAwareAdherenceAnalyzer(BaseAnalyzer):
                 f"Improve alignment with {domain.value} domain by using domain-specific "
                 "imports, naming conventions, and structural patterns"
             )
+
+        return suggestions
+
+    def _generate_enhanced_domain_recommendation(
+        self,
+        file_path: str,
+        classification: DomainClassificationResult,
+        severity: Severity,
+    ) -> Recommendation:
+        """Generate enhanced domain classification recommendation with detailed diagnostics.
+
+        Args:
+            file_path: Path to the file
+            classification: Domain classification result
+            severity: Severity level for the recommendation
+
+        Returns:
+            Enhanced recommendation with detailed diagnostics
+        """
+        # Get diagnostic details from the domain classifier
+        try:
+            # Extract file content to get diagnostics
+            from pathlib import Path
+
+            file_content = ""
+            try:
+                file_content = Path(file_path).read_text(
+                    encoding="utf-8", errors="ignore"
+                )
+            except Exception as e:
+                logger.warning(f"Could not read file {file_path} for diagnostics: {e}")
+
+            diagnostics = self.domain_classifier.get_classification_diagnostics(
+                file_path, file_content
+            )
+            # Ensure diagnostics is a dictionary
+            if not isinstance(diagnostics, dict):
+                diagnostics = {}
+        except Exception as e:
+            logger.warning(f"Could not get diagnostics for {file_path}: {e}")
+            diagnostics = {}
+
+        # Create enhanced message with detailed breakdown
+        confidence_desc = (
+            "very low"
+            if classification.confidence < 0.3
+            else (
+                "low"
+                if classification.confidence < 0.5
+                else "moderate" if classification.confidence < 0.6 else "unclear"
+            )
+        )
+        message_parts = [
+            f"Domain classification {confidence_desc} for '{Path(file_path).name}' ({classification.confidence:.2f} confidence)"
+        ]
+
+        # Add domain evaluation breakdown
+        if (
+            classification.classification_factors
+            and "combined_scores" in classification.classification_factors
+        ):
+            combined_scores = classification.classification_factors["combined_scores"]
+            # Get top 3 domains by score
+            top_domains = sorted(
+                [
+                    (domain, score)
+                    for domain, score in combined_scores.items()
+                    if score > 0.05
+                ],
+                key=lambda x: x[1],
+                reverse=True,
+            )[:3]
+
+            if top_domains:
+                message_parts.append("\nEvaluated domains:")
+                for domain_name, score in top_domains:
+                    domain_enum = self._get_domain_enum_by_name(domain_name)
+                    missing_patterns = self._get_missing_patterns_summary(
+                        diagnostics, domain_enum
+                    )
+                    missing_text = (
+                        f" (missing: {missing_patterns})" if missing_patterns else ""
+                    )
+                    message_parts.append(
+                        f"  - {domain_name.title()}: {score:.2f}{missing_text}"
+                    )
+
+        # Add specific improvements
+        improvements = self._generate_domain_specific_improvements(
+            file_path, classification, diagnostics
+        )
+        if improvements:
+            message_parts.append("\nSpecific improvements:")
+            for i, improvement in enumerate(improvements[:4], 1):
+                message_parts.append(f"{i}. {improvement}")
+
+        enhanced_message = "".join(message_parts)
+
+        # Create more specific suggested fix based on improvements
+        if improvements:
+            # Use the first 3 most specific improvements as the suggested fix
+            suggested_fix = "; ".join(improvements[:3])
+        else:
+            # Fallback to generic suggestions
+            suggested_fixes = [
+                "Review file location and ensure it's in the appropriate domain directory",
+                "Add domain-specific imports and patterns",
+                "Consider splitting mixed concerns into separate files",
+            ]
+            suggested_fix = "; ".join(suggested_fixes)
+
+        return Recommendation(
+            severity=severity,
+            category="domain_classification",
+            message=enhanced_message,
+            file_path=file_path,
+            line_number=None,
+            suggested_fix=suggested_fix,
+            rule_id="UNCLEAR_DOMAIN_ENHANCED",
+        )
+
+    def _get_domain_enum_by_name(self, domain_name: str) -> ArchitecturalDomain:
+        """Get ArchitecturalDomain enum by name."""
+        try:
+            return ArchitecturalDomain(domain_name.lower())
+        except ValueError:
+            return ArchitecturalDomain.UNKNOWN
+
+    def _get_missing_patterns_summary(
+        self,
+        diagnostics: dict[ArchitecturalDomain, list[DomainDiagnostics]],
+        domain: ArchitecturalDomain,
+    ) -> str:
+        """Get a summary of missing patterns for a domain."""
+        if not diagnostics or domain not in diagnostics:
+            return ""
+
+        all_missing = []
+        for diag in diagnostics[domain]:
+            # Prioritize the most actionable missing patterns
+            if diag.pattern_category == "import":
+                # Import patterns are most actionable - show top missing imports
+                relevant_missing = [
+                    p for p in diag.missing_patterns[:3] if not p.startswith("r")
+                ]
+                all_missing.extend(relevant_missing)
+            elif diag.pattern_category == "content":
+                # Content patterns are second most actionable
+                relevant_missing = [
+                    p for p in diag.missing_patterns[:2] if not p.startswith("r")
+                ]
+                all_missing.extend(relevant_missing)
+            elif diag.pattern_category == "path":
+                # Path patterns last (often just directory suggestions)
+                relevant_missing = [
+                    p for p in diag.missing_patterns[:1] if not p.startswith("r")
+                ]
+                all_missing.extend(relevant_missing)
+
+        # Remove duplicates and limit total to most actionable
+        unique_missing = list(dict.fromkeys(all_missing))[:3]
+        return ", ".join(unique_missing)
+
+    def _generate_domain_specific_improvements(
+        self,
+        file_path: str,
+        classification: DomainClassificationResult,
+        diagnostics: dict[ArchitecturalDomain, list[DomainDiagnostics]],
+    ) -> list[str]:
+        """Generate domain-specific improvement suggestions."""
+        from pathlib import Path
+
+        improvements = []
+        file_ext = Path(file_path).suffix.lower()
+        file_name = Path(file_path).name
+
+        # Get the top domains from classification factors to provide targeted suggestions
+        top_domains = []
+        if (
+            classification.classification_factors
+            and "combined_scores" in classification.classification_factors
+        ):
+            combined_scores = classification.classification_factors["combined_scores"]
+            top_domains = sorted(
+                [
+                    (domain, score)
+                    for domain, score in combined_scores.items()
+                    if score > 0.1
+                ],
+                key=lambda x: x[1],
+                reverse=True,
+            )[:3]
+
+        # Analyze missing patterns from diagnostics to provide specific suggestions
+        missing_by_category: dict[str, list[str]] = {
+            "import": [],
+            "content": [],
+            "path": [],
+        }
+        for domain_diags in diagnostics.values():
+            for diag in domain_diags:
+                if diag.pattern_category in missing_by_category:
+                    # Get human-readable missing patterns
+                    missing_by_category[diag.pattern_category].extend(
+                        diag.missing_patterns[:2]
+                    )
+
+        # Generate file-extension specific suggestions
+        if file_ext in [".tsx", ".jsx", ".ts", ".js"]:
+            improvements.extend(
+                self._get_javascript_improvements(
+                    file_path, file_name, file_ext, top_domains, missing_by_category
+                )
+            )
+        elif file_ext in [".py"]:
+            improvements.extend(
+                self._get_python_improvements(
+                    file_path, file_name, top_domains, missing_by_category
+                )
+            )
+        elif file_ext in [".sql"]:
+            improvements.extend(
+                self._get_database_improvements(
+                    file_path, file_name, missing_by_category
+                )
+            )
+        elif file_ext in [".md", ".mdx"]:
+            improvements.append(
+                "Move to 'docs/' directory or add proper documentation structure"
+            )
+            improvements.append("Include frontmatter or proper markdown formatting")
+
+        # Add domain-specific suggestions based on top scoring domains
+        for domain_name, score in top_domains:
+            if score > 0.2:  # Only suggest for domains with reasonable scores
+                improvements.extend(
+                    self._get_domain_specific_suggestions(domain_name, file_path)
+                )
+
+        # Generic improvements based on primary domain
+        if classification.domain == ArchitecturalDomain.UNKNOWN:
+            improvements.append(
+                "Add clear domain indicators (imports, directory structure, or file naming)"
+            )
+            improvements.append(
+                "Consider splitting file if it contains mixed domain concerns"
+            )
+
+        # Path-based suggestions
+        if "src/" not in file_path and file_ext in [
+            ".tsx",
+            ".jsx",
+            ".ts",
+            ".js",
+            ".py",
+        ]:
+            improvements.append("Move to 'src/' directory for better organization")
+
+        # Remove duplicates and limit
+        unique_improvements = list(dict.fromkeys(improvements))
+        return unique_improvements[:5]  # Limit to 5 most relevant improvements
+
+    def _get_javascript_improvements(
+        self,
+        file_path: str,
+        file_name: str,
+        file_ext: str,
+        top_domains: list[tuple[str, float]],
+        missing_by_category: dict[str, list[str]],
+    ) -> list[str]:
+        """Get JavaScript/TypeScript specific improvements."""
+        improvements = []
+
+        # Check if React patterns are missing
+        if any(
+            "React" in missing or "JSX" in missing
+            for missing in missing_by_category["import"]
+            + missing_by_category["content"]
+        ):
+            if file_ext in [".tsx", ".jsx"]:
+                improvements.append("Add React imports: import React from 'react'")
+                improvements.append(
+                    "Include JSX elements with proper component structure"
+                )
+
+        # Check for Next.js patterns
+        if any(
+            "Next.js" in missing or "API" in missing
+            for missing in missing_by_category["import"]
+        ):
+            if "api" in file_path.lower():
+                improvements.append(
+                    "Add Next.js API route structure: export async function GET(request) { ... }"
+                )
+                improvements.append(
+                    "Include NextRequest/NextResponse imports from 'next/server'"
+                )
+            elif file_ext in [".tsx", ".jsx"]:
+                improvements.append(
+                    "Add Next.js imports like useRouter, Link, or Image from 'next/*'"
+                )
+
+        # Component vs Page suggestions
+        if "component" in file_name.lower():
+            improvements.append("Move to 'src/components/' directory")
+            improvements.append(
+                "Export component as default: export default function ComponentName()"
+            )
+        elif "page" in file_name.lower():
+            improvements.append("Move to 'src/app/' or 'src/pages/' directory")
+
+        # Testing patterns
+        if any(domain_name == "testing" for domain_name, _ in top_domains):
+            improvements.append(
+                "Add testing imports: import { describe, test, expect } from 'jest' or 'vitest'"
+            )
+            improvements.append("Include test structure: describe() and test() blocks")
+
+        return improvements
+
+    def _get_python_improvements(
+        self,
+        file_path: str,
+        file_name: str,
+        top_domains: list[tuple[str, float]],
+        missing_by_category: dict[str, list[str]],
+    ) -> list[str]:
+        """Get Python-specific improvements."""
+        improvements = []
+
+        # Backend framework suggestions
+        backend_score = next(
+            (score for domain, score in top_domains if domain == "backend"), 0
+        )
+        if backend_score > 0.1:
+            improvements.append(
+                "Add Python web framework imports (FastAPI, Flask, Django)"
+            )
+            improvements.append("Include request/response handling patterns")
+
+        # Testing suggestions
+        testing_score = next(
+            (score for domain, score in top_domains if domain == "testing"), 0
+        )
+        if testing_score > 0.1:
+            improvements.append("Add testing imports: import pytest or import unittest")
+            improvements.append("Include test functions with test_ prefix")
+
+        # Database patterns
+        if "model" in file_name.lower() or "schema" in file_name.lower():
+            improvements.append("Add ORM imports (SQLAlchemy, Django ORM, etc.)")
+            improvements.append("Include database model definitions")
+
+        return improvements
+
+    def _get_database_improvements(
+        self, file_path: str, file_name: str, missing_by_category: dict[str, list[str]]
+    ) -> list[str]:
+        """Get database-specific improvements."""
+        improvements = []
+
+        improvements.append(
+            "Move to 'migrations/', 'schema/', or 'database/' directory"
+        )
+        improvements.append(
+            "Include proper SQL DDL statements (CREATE TABLE, ALTER TABLE)"
+        )
+
+        if "migration" in file_name.lower():
+            improvements.append(
+                "Add migration-specific patterns (UP/DOWN, version control)"
+            )
+
+        return improvements
+
+    def _get_domain_specific_suggestions(
+        self, domain_name: str, file_path: str
+    ) -> list[str]:
+        """Get suggestions specific to a domain."""
+        suggestions = []
+
+        if domain_name == "frontend":
+            suggestions.append("Add React hooks or component lifecycle patterns")
+            suggestions.append("Include CSS-in-JS or styling imports")
+        elif domain_name == "backend":
+            suggestions.append("Add server-side request handling patterns")
+            suggestions.append("Include middleware or authentication patterns")
+        elif domain_name == "database":
+            suggestions.append("Add database connection or ORM patterns")
+            suggestions.append("Include proper schema definitions")
+        elif domain_name == "testing":
+            suggestions.append("Add test assertions and mocking patterns")
+            suggestions.append("Include proper test setup/teardown")
+        elif domain_name == "infrastructure":
+            suggestions.append("Add deployment or configuration patterns")
+            suggestions.append("Include environment-specific settings")
 
         return suggestions
 
