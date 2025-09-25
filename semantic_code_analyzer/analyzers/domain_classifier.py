@@ -324,10 +324,25 @@ class DomainClassifier(BaseAnalyzer):
                     r"import.*from\s+['\"]react['\"]",
                     r"import.*from\s+['\"]next/.*['\"]",
                     r"import.*from\s+['\"]@/components/.*['\"]",
-                    r"use client",
+                    r"['\"]use client['\"]",
                     r"import.*useState|useEffect|useCallback",
                     r"import.*from\s+['\"]styled-components['\"]",
                     r"import.*from\s+['\"]@emotion/.*['\"]",
+                    # React 18+ and modern patterns
+                    r"useDeferredValue|useTransition|useId",
+                    r"Suspense|ErrorBoundary|startTransition",
+                    r"import.*from\s+['\"]client-only['\"]",
+                    r"forwardRef|createPortal",
+                    # Next.js App Router specific
+                    r"import.*from\s+['\"]next/navigation['\"]",
+                    r"useRouter|useSearchParams|usePathname",
+                    # Modern CSS and styling
+                    r"import.*from\s+['\"]tailwindcss['\"]",
+                    r"className=|tw\.|clsx\(|cn\(",
+                    # State management
+                    r"import.*from\s+['\"]zustand['\"]",
+                    r"import.*from\s+['\"]jotai['\"]",
+                    r"import.*from\s+['\"]@tanstack/react-query['\"]",
                 ],
                 "weight": 0.8,
             },
@@ -340,6 +355,20 @@ class DomainClassifier(BaseAnalyzer):
                     r"import.*from\s+['\"]koa['\"]",
                     r"import.*from\s+['\"]node:.*['\"]",
                     r"import.*fs|path|crypto",
+                    # Next.js App Router API patterns
+                    r"['\"]use server['\"]",
+                    r"import.*from\s+['\"]server-only['\"]",
+                    r"cookies\(\)|headers\(\)",
+                    r"redirect\(|notFound\(\)",
+                    # Modern Node.js patterns
+                    r"import.*from\s+['\"]@vercel/.*['\"]",
+                    r"import.*from\s+['\"]@planetscale/.*['\"]",
+                    r"import.*from\s+['\"]@supabase/.*['\"]",
+                    # Authentication and middleware
+                    r"import.*from\s+['\"]next-auth.*['\"]",
+                    r"import.*from\s+['\"]@auth/.*['\"]",
+                    r"middleware\.(ts|js)",
+                    r"cors|helmet|morgan|ratelimit",
                 ],
                 "weight": 0.8,
             },
@@ -352,6 +381,18 @@ class DomainClassifier(BaseAnalyzer):
                     r"import.*from\s+['\"]sequelize['\"]",
                     r"import.*from\s+['\"]pg['\"]",
                     r"import.*from\s+['\"]mysql.*['\"]",
+                    # Modern database tools and ORMs
+                    r"import.*from\s+['\"]@prisma/client['\"]",
+                    r"import.*from\s+['\"]drizzle-kit['\"]",
+                    r"import.*from\s+['\"]kysely['\"]",
+                    r"import.*from\s+['\"]@planetscale/database['\"]",
+                    r"import.*from\s+['\"]@supabase/supabase-js['\"]",
+                    r"import.*from\s+['\"]redis['\"]",
+                    r"import.*from\s+['\"]ioredis['\"]",
+                    # Database connection and pooling
+                    r"import.*from\s+['\"]@vercel/postgres['\"]",
+                    r"import.*from\s+['\"]@neondatabase/serverless['\"]",
+                    r"PrismaClient|DrizzleClient|DatabaseClient",
                 ],
                 "weight": 0.9,
             },
@@ -363,6 +404,20 @@ class DomainClassifier(BaseAnalyzer):
                     r"import.*from\s+['\"]cypress['\"]",
                     r"import.*from\s+['\"]playwright['\"]",
                     r"describe|test|it|expect",
+                    # Modern testing frameworks and tools
+                    r"import.*from\s+['\"]@playwright/test['\"]",
+                    r"import.*from\s+['\"]@storybook/.*['\"]",
+                    r"import.*from\s+['\"]msw['\"]",  # Mock Service Worker
+                    r"import.*from\s+['\"]@faker-js/faker['\"]",
+                    r"import.*from\s+['\"]factory-girl['\"]",
+                    r"beforeEach|afterEach|beforeAll|afterAll",
+                    r"mock|spy|stub|vi\.mock",
+                    # React Testing Library specific
+                    r"render|screen\.|fireEvent|userEvent",
+                    r"waitFor|findBy|queryBy|getBy",
+                    # E2E testing patterns
+                    r"page\.|locator\.|goto\(|click\(",
+                    r"test\.describe|test\.beforeEach",
                 ],
                 "weight": 0.9,
             },
@@ -379,6 +434,26 @@ class DomainClassifier(BaseAnalyzer):
                     r"onClick=|onChange=|onSubmit=",
                     r"React\.FC|FC<",
                     r"useState|useEffect|useContext",
+                    # React 18+ patterns
+                    r"Suspense.*fallback=",
+                    r"startTransition\(|useDeferredValue\(",
+                    r"useId\(|useTransition\(",
+                    # Next.js App Router patterns
+                    r"params:|searchParams:",
+                    r"generateMetadata|generateStaticParams",
+                    r"layout\.tsx|page\.tsx|loading\.tsx",
+                    # Modern React patterns
+                    r"forwardRef<.*>|createPortal\(",
+                    r"memo\(.*\)|useCallback\(.*\)|useMemo\(",
+                    # Modern styling
+                    r"clsx\(|cn\(|tw\.|@apply",
+                    r"variants:|compoundVariants:",
+                    # Form handling
+                    r"useForm\(|register\(|handleSubmit",
+                    r"zodResolver|yupResolver",
+                    # State management
+                    r"useStore\(|atom\(|selector\(",
+                    r"create\(.*=>\s*\{",  # Zustand store
                 ],
                 "weight": 0.7,
             },
@@ -390,6 +465,22 @@ class DomainClassifier(BaseAnalyzer):
                     r"async\s+function.*handler",
                     r"middleware",
                     r"cors|helmet|morgan",
+                    # Next.js App Router API patterns
+                    r"NextRequest|NextResponse",
+                    r"cookies\(\)\.set|headers\(\)\.get",
+                    r"redirect\(|notFound\(\)",
+                    # Server actions
+                    r"['\"]use server['\"]",
+                    r"revalidatePath\(|revalidateTag\(",
+                    # Modern Node.js patterns
+                    r"process\.env\.|Bun\.|Deno\.",
+                    # Authentication patterns
+                    r"jwt\.sign|bcrypt\.|scrypt\.",
+                    r"getServerSession|auth\(\)",
+                    # Database operations in API context
+                    r"await\s+db\.|await\s+prisma\.",
+                    # Validation and error handling
+                    r"z\.|zod\.|validator\.",
                 ],
                 "weight": 0.8,
             },
@@ -400,6 +491,21 @@ class DomainClassifier(BaseAnalyzer):
                     r"schema\.|model\.|entity\.",
                     r"migration|migrate",
                     r"connection|connect|disconnect",
+                    # Modern ORM patterns
+                    r"\.query\(|\.execute\(|\.transaction\(",
+                    r"\.select\(\)|\.where\(\)|\.orderBy\(",
+                    r"\.join\(|\.leftJoin\(|\.innerJoin\(",
+                    r"@Entity\(|@Table\(|@Column\(",
+                    r"PrismaClient\(\)|DrizzleClient\(\)",
+                    # Database operations
+                    r"upsert\(|deleteMany\(|updateMany\(",
+                    r"aggregate\(|groupBy\(|count\(\)",
+                    # Schema definitions
+                    r"relations\(|references\(|primaryKey\(",
+                    r"varchar\(|integer\(|boolean\(|timestamp\(",
+                    # Migration patterns
+                    r"createTable\(|dropTable\(|alterTable\(",
+                    r"addColumn\(|dropColumn\(|addIndex\(",
                 ],
                 "weight": 0.9,
             },
@@ -410,6 +516,26 @@ class DomainClassifier(BaseAnalyzer):
                     r"beforeEach|afterEach|beforeAll|afterAll",
                     r"mock|spy|stub",
                     r"render\(|screen\.|fireEvent",
+                    # Modern testing patterns
+                    r"vi\.mock\(|vi\.spyOn\(|vi\.fn\(",  # Vitest
+                    r"waitFor\(|findBy|queryBy|getBy",
+                    r"userEvent\.|fireEvent\.",
+                    r"toHaveBeenCalled|toHaveBeenCalledWith",
+                    r"toBeInTheDocument\(|toHaveClass\(",
+                    # E2E testing
+                    r"page\.goto\(|page\.click\(|page\.fill\(",
+                    r"locator\(|getByRole\(|getByText\(",
+                    r"expect\(page\)\.|await page\.",
+                    # Component testing
+                    r"mount\(|shallow\(|render\(",
+                    r"wrapper\.find\(|wrapper\.prop\(",
+                    # API testing
+                    r"supertest\(|request\(.*\)\.",
+                    r"\.get\(|\.post\(|\.put\(|\.delete\(",
+                    # Mock patterns
+                    r"jest\.mock\(|jest\.spyOn\(",
+                    r"mockResolvedValue|mockRejectedValue",
+                    r"msw\.|setupServer\(|rest\.",
                 ],
                 "weight": 0.9,
             },

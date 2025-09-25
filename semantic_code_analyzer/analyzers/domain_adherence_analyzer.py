@@ -107,8 +107,7 @@ class DomainAwareAdherenceAnalyzer(BaseAnalyzer):
             device_manager: DeviceManager for hardware acceleration (optional).
             progress_callback: Optional callback to report initialization progress.
         """
-        logger.info("=== DOMAIN ADHERENCE ANALYZER INIT ===")
-        logger.info("Starting DomainAwareAdherenceAnalyzer initialization")
+        logger.debug("Starting DomainAwareAdherenceAnalyzer initialization")
 
         # Store progress callback for reporting
         self.progress_callback = progress_callback
@@ -121,59 +120,43 @@ class DomainAwareAdherenceAnalyzer(BaseAnalyzer):
 
         report_progress("Initializing base analyzer...")
         try:
-            logger.info("Calling super().__init__(config)...")
             super().__init__(config)
-            logger.info("Parent BaseAnalyzer initialized successfully")
         except Exception as e:
             logger.error(f"Failed to initialize parent BaseAnalyzer: {e}")
             raise
 
         # Initialize components
         report_progress("Initializing domain classifier...")
-        logger.info("Initializing DomainClassifier...")
         try:
             self.domain_classifier = DomainClassifier(config)
-            logger.info("DomainClassifier initialized successfully")
         except Exception as e:
             logger.error(f"Failed to initialize DomainClassifier: {e}")
             raise
 
         # Handle config safely
         config = config or {}
-        logger.info(f"Using config: {config}")
 
         # Initialize pattern indexer if dependencies are available
         report_progress("Checking ML model dependencies...")
-        logger.info("Checking PatternIndexer dependencies...")
         if PatternIndexer is not None:
             report_progress("Loading GraphCodeBERT model (this may take a while)...")
-            logger.info("PatternIndexer dependencies available - initializing...")
-            logger.info("WARNING: This is where the segfault likely occurs!")
 
             model_name = config.get("model_name", "microsoft/graphcodebert-base")
             cache_dir = config.get("cache_dir")
-            logger.info(f"Model name: {model_name}")
-            logger.info(f"Cache dir: {cache_dir}")
-            logger.info(f"Device manager provided: {device_manager is not None}")
 
             def pattern_indexer_progress_callback(message: str) -> None:
                 """Nested progress callback for pattern indexer."""
                 report_progress(f"Model loading: {message}")
 
             try:
-                logger.info(
-                    "Creating PatternIndexer - this may load heavy ML models..."
-                )
                 self.pattern_indexer = PatternIndexer(
                     model_name=model_name,
                     cache_dir=cache_dir,
                     device_manager=device_manager,
                     progress_callback=pattern_indexer_progress_callback,
                 )
-                logger.info("PatternIndexer initialized successfully!")
             except Exception as e:
-                logger.error(f"CRITICAL: PatternIndexer initialization failed: {e}")
-                logger.exception("Full traceback for PatternIndexer failure:")
+                logger.error(f"PatternIndexer initialization failed: {e}")
                 raise
         else:
             report_progress(
@@ -186,26 +169,17 @@ class DomainAwareAdherenceAnalyzer(BaseAnalyzer):
 
         # Configuration parameters
         report_progress("Finalizing analyzer configuration...")
-        logger.info("Setting configuration parameters...")
-        self.similarity_threshold = config.get("similarity_threshold", 0.3)
+        self.similarity_threshold = config.get("similarity_threshold", 0.4)
         self.min_patterns_for_analysis = config.get("min_patterns_for_analysis", 3)
-        self.max_similar_patterns = config.get("max_similar_patterns", 10)
+        self.max_similar_patterns = config.get("max_similar_patterns", 15)
         self.domain_confidence_threshold = config.get(
-            "domain_confidence_threshold", 0.6
+            "domain_confidence_threshold", 0.8
         )
-        logger.info(f"Similarity threshold: {self.similarity_threshold}")
-        logger.info(f"Min patterns for analysis: {self.min_patterns_for_analysis}")
-        logger.info(f"Max similar patterns: {self.max_similar_patterns}")
-        logger.info(f"Domain confidence threshold: {self.domain_confidence_threshold}")
 
         # Track if indices have been built
         self._indices_built: set[str] = set()
 
         report_progress("Domain adherence analyzer ready!")
-        logger.info("=== DOMAIN ADHERENCE ANALYZER INITIALIZATION COMPLETE ===")
-
-        logger.info("=== DOMAIN ADHERENCE ANALYZER INIT COMPLETE ===")
-        logger.info("DomainAwareAdherenceAnalyzer initialized successfully!")
 
     def get_analyzer_name(self) -> str:
         """Return the name identifier for this analyzer.
@@ -436,12 +410,22 @@ class DomainAwareAdherenceAnalyzer(BaseAnalyzer):
             pattern_similarity = 0.0
             max_similarity = 0.0
 
-        # Domain adherence calculation
+        # Enhanced domain adherence calculation
         if domain_classification.domain == ArchitecturalDomain.UNKNOWN:
-            domain_adherence = 0.3  # Neutral score for unknown domains
+            # Improved handling for unknown domains - less punitive
+            if pattern_similarity > 0.5:
+                domain_adherence = 0.6  # Good patterns even if domain unclear
+            elif pattern_similarity > 0.3:
+                domain_adherence = 0.5  # Moderate patterns
+            else:
+                domain_adherence = 0.4  # Neutral fallback
         else:
-            # Weight by domain confidence and pattern similarity
-            domain_adherence = (domain_match_quality * 0.6) + (pattern_similarity * 0.4)
+            # Enhanced weight by domain confidence and pattern similarity
+            domain_adherence = (domain_match_quality * 0.5) + (pattern_similarity * 0.5)
+
+            # Boost score for well-classified domains with good patterns
+            if domain_match_quality > 0.8 and pattern_similarity > 0.6:
+                domain_adherence = min(1.0, domain_adherence * 1.1)
 
         # Overall adherence combines multiple factors
         overall_adherence = self._calculate_weighted_adherence(
@@ -468,7 +452,7 @@ class DomainAwareAdherenceAnalyzer(BaseAnalyzer):
     def _calculate_weighted_adherence(
         self, domain_quality: float, pattern_similarity: float, pattern_count: int
     ) -> float:
-        """Calculate weighted overall adherence score.
+        """Calculate improved weighted overall adherence score.
 
         Args:
             domain_quality: Quality of domain classification
@@ -478,20 +462,35 @@ class DomainAwareAdherenceAnalyzer(BaseAnalyzer):
         Returns:
             Overall adherence score (0.0 to 1.0)
         """
-        # Base weights
-        domain_weight = 0.3
-        similarity_weight = 0.5
-        coverage_weight = 0.2
+        # Enhanced base score for better starting point
+        base_score = 0.5
 
-        # Coverage bonus based on number of patterns
-        coverage_score = min(1.0, pattern_count / 10.0)
+        # Adjusted weights for better balance
+        domain_weight = 0.25
+        similarity_weight = 0.6  # Higher weight on actual pattern similarity
+        coverage_weight = 0.15
 
-        # Weighted combination
+        # Enhanced coverage bonus with better scaling
+        coverage_score = min(1.0, pattern_count / 8.0)
+
+        # Weighted combination with base score
         overall_score = (
-            domain_quality * domain_weight
-            + pattern_similarity * similarity_weight
-            + coverage_score * coverage_weight
+            base_score
+            + (
+                domain_quality * domain_weight
+                + pattern_similarity * similarity_weight
+                + coverage_score * coverage_weight
+            )
+            * 0.5
         )
+
+        # Additional bonuses for high-quality classifications
+        if domain_quality > 0.8:
+            overall_score += 0.05
+        if pattern_similarity > 0.7:
+            overall_score += 0.05
+        if pattern_count >= 5:
+            overall_score += 0.03
 
         return max(0.0, min(1.0, overall_score))
 
@@ -568,37 +567,54 @@ class DomainAwareAdherenceAnalyzer(BaseAnalyzer):
         """
         recommendations = []
 
-        # Low overall adherence
-        if analysis.adherence_score.overall_adherence < 0.5:
+        # Enhanced adherence recommendations with better thresholds
+        if analysis.adherence_score.overall_adherence < 0.4:
+            # Only trigger error for very low scores
             severity = (
                 Severity.ERROR
-                if analysis.adherence_score.overall_adherence < 0.3
+                if analysis.adherence_score.overall_adherence < 0.25
+                else Severity.WARNING
+            )
+
+            # Provide more specific guidance
+            domain_name = analysis.domain_classification.domain.value
+            if domain_name == "unknown":
+                message = f"Code patterns unclear - consider improving domain-specific implementation ({analysis.adherence_score.overall_adherence:.2f})"
+                suggested_fix = "Add domain-specific imports, naming conventions, or move to appropriate directory structure"
+            else:
+                message = f"Low adherence to {domain_name} domain patterns ({analysis.adherence_score.overall_adherence:.2f})"
+                suggested_fix = f"Review similar {domain_name} patterns in the codebase and align implementation"
+
+            recommendations.append(
+                Recommendation(
+                    severity=severity,
+                    category="domain_adherence",
+                    message=message,
+                    file_path=file_path,
+                    line_number=None,
+                    suggested_fix=suggested_fix,
+                    rule_id="LOW_DOMAIN_ADHERENCE",
+                )
+            )
+
+        # Improved domain classification recommendations
+        if (
+            analysis.domain_classification.confidence < 0.7
+        ):  # Raised from domain_confidence_threshold
+            severity = (
+                Severity.INFO
+                if analysis.domain_classification.confidence > 0.5
                 else Severity.WARNING
             )
 
             recommendations.append(
                 Recommendation(
                     severity=severity,
-                    category="domain_adherence",
-                    message=f"Low adherence to {analysis.domain_classification.domain.value} domain patterns "
-                    f"({analysis.adherence_score.overall_adherence:.2f})",
-                    file_path=file_path,
-                    line_number=None,
-                    suggested_fix="Review similar patterns in the codebase and align implementation",
-                    rule_id="LOW_DOMAIN_ADHERENCE",
-                )
-            )
-
-        # Poor domain classification
-        if analysis.domain_classification.confidence < self.domain_confidence_threshold:
-            recommendations.append(
-                Recommendation(
-                    severity=Severity.WARNING,
                     category="domain_classification",
-                    message=f"Unclear domain classification ({analysis.domain_classification.confidence:.2f} confidence)",
+                    message=f"Domain classification could be clearer ({analysis.domain_classification.confidence:.2f} confidence)",
                     file_path=file_path,
                     line_number=None,
-                    suggested_fix="Add domain-specific patterns or move to appropriate directory",
+                    suggested_fix="Add domain-specific patterns or move to appropriate directory structure",
                     rule_id="UNCLEAR_DOMAIN",
                 )
             )

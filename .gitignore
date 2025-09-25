@@ -351,3 +351,4 @@ dist/
 *.egg-info/
 
 .mcp.json
+benchmarks.txt

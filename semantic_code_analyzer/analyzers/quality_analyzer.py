@@ -158,7 +158,7 @@ class QualityAnalyzer(BaseAnalyzer):
         )
 
     def _init_react_patterns(self) -> dict[str, Any]:
-        """Initialize React component patterns."""
+        """Initialize comprehensive React component patterns including React 18+ features."""
         return {
             "function_component": {
                 "pattern": r"(export\s+default\s+)?function\s+\w+\s*\([^)]*\)\s*:\s*React\.ReactElement",
@@ -170,10 +170,57 @@ class QualityAnalyzer(BaseAnalyzer):
                 "score_bonus": 0.1,
                 "description": "Defines proper TypeScript interface for props",
             },
+            # Next.js App Router patterns
             "use_client_directive": {
                 "pattern": r"['\"]use client['\"]",
-                "score_bonus": 0.05,
-                "description": "Properly marks client components",
+                "score_bonus": 0.08,
+                "description": "Properly marks client components for Next.js App Router",
+            },
+            "use_server_directive": {
+                "pattern": r"['\"]use server['\"]",
+                "score_bonus": 0.08,
+                "description": "Properly marks server actions for Next.js App Router",
+            },
+            "app_router_layout": {
+                "pattern": r"export\s+default\s+function\s+.*Layout\s*\(",
+                "score_bonus": 0.1,
+                "description": "Uses Next.js App Router layout pattern",
+            },
+            "app_router_page": {
+                "pattern": r"export\s+default\s+function\s+.*Page\s*\(",
+                "score_bonus": 0.08,
+                "description": "Uses Next.js App Router page pattern",
+            },
+            "app_router_loading": {
+                "pattern": r"export\s+default\s+function\s+Loading\s*\(",
+                "score_bonus": 0.06,
+                "description": "Implements Next.js App Router loading UI",
+            },
+            "app_router_error": {
+                "pattern": r"export\s+default\s+function\s+Error\s*\(",
+                "score_bonus": 0.08,
+                "description": "Implements Next.js App Router error UI",
+            },
+            "app_router_not_found": {
+                "pattern": r"export\s+default\s+function\s+NotFound\s*\(",
+                "score_bonus": 0.06,
+                "description": "Implements Next.js App Router 404 UI",
+            },
+            # React 18+ concurrent features
+            "suspense_usage": {
+                "pattern": r"<Suspense\s+fallback",
+                "score_bonus": 0.12,
+                "description": "Uses React 18 Suspense for concurrent rendering",
+            },
+            "concurrent_features": {
+                "patterns": [
+                    r"useDeferredValue\s*\(",
+                    r"useTransition\s*\(",
+                    r"startTransition\s*\(",
+                    r"React\.startTransition",
+                ],
+                "score_bonus": 0.15,
+                "description": "Uses React 18 concurrent features",
             },
             "react_hooks": {
                 "patterns": [
@@ -183,13 +230,70 @@ class QualityAnalyzer(BaseAnalyzer):
                     r"useMemo\s*\(",
                     r"useContext\s*\(",
                     r"useReducer\s*\(",
+                    r"useRef\s*\(",
+                    r"useImperativeHandle\s*\(",
+                    r"useLayoutEffect\s*\(",
+                    r"useDebugValue\s*\(",
+                    # React 18+ hooks
+                    r"useId\s*\(",
+                    r"useSyncExternalStore\s*\(",
+                    r"useInsertionEffect\s*\(",
                 ],
                 "score_bonus": 0.05,
+                "description": "Uses React hooks including React 18+ hooks",
             },
             "custom_hooks": {
                 "pattern": r"use[A-Z]\w*\s*\(",
                 "score_bonus": 0.1,
                 "description": "Uses custom hooks",
+            },
+            # Server components patterns
+            "server_component": {
+                "pattern": r"async\s+function\s+\w+\s*\([^)]*\)\s*:\s*Promise<",
+                "score_bonus": 0.12,
+                "description": "Uses React Server Components pattern",
+            },
+            "server_only_import": {
+                "pattern": r"import\s+.*['\"]server-only['\"]",
+                "score_bonus": 0.08,
+                "description": "Properly isolates server-only code",
+            },
+            "client_only_import": {
+                "pattern": r"import\s+.*['\"]client-only['\"]",
+                "score_bonus": 0.08,
+                "description": "Properly isolates client-only code",
+            },
+            # Advanced React patterns
+            "forward_ref": {
+                "pattern": r"forwardRef\s*\(",
+                "score_bonus": 0.08,
+                "description": "Uses React forwardRef for ref forwarding",
+            },
+            "react_portal": {
+                "pattern": r"createPortal\s*\(",
+                "score_bonus": 0.08,
+                "description": "Uses React Portal for rendering outside tree",
+            },
+            "context_provider": {
+                "pattern": r"\.Provider\s+value=",
+                "score_bonus": 0.10,
+                "description": "Implements React Context provider pattern",
+            },
+            # Modern TypeScript React patterns
+            "generic_components": {
+                "pattern": r"function\s+\w+<[^>]+>\s*\(",
+                "score_bonus": 0.12,
+                "description": "Uses generic TypeScript React components",
+            },
+            "discriminated_props": {
+                "pattern": r"type\s+\w+Props\s*=\s*\{[^}]*\}\s*&\s*\(",
+                "score_bonus": 0.10,
+                "description": "Uses discriminated union props pattern",
+            },
+            "as_prop_pattern": {
+                "pattern": r"as\?:\s*(keyof\s+JSX\.IntrinsicElements|React\.ElementType)",
+                "score_bonus": 0.10,
+                "description": "Implements polymorphic 'as' prop pattern",
             },
         }
 
@@ -289,85 +393,135 @@ class QualityAnalyzer(BaseAnalyzer):
         )
 
     def _analyze_react_patterns(self, content: str) -> list[PatternMatch]:
-        """Analyze React component patterns."""
+        """Analyze comprehensive React component patterns including modern features."""
         patterns = []
 
-        # Check function component pattern
-        func_component = re.search(
-            self.react_patterns["function_component"]["pattern"], content
-        )
-        if func_component:
-            line_num = content[: func_component.start()].count("\n") + 1
-            patterns.append(
-                PatternMatch(
-                    pattern_type=PatternType.COMPONENT,
-                    pattern_name="function_component",
-                    file_path="",
-                    line_number=line_num,
-                    column=func_component.start(),
-                    matched_text=func_component.group(),
-                    confidence=0.9,
-                    context={"component_type": "function"},
-                )
-            )
+        # Single pattern checks
+        single_patterns = [
+            "function_component",
+            "proper_props_interface",
+            "use_client_directive",
+            "use_server_directive",
+            "app_router_layout",
+            "app_router_page",
+            "app_router_loading",
+            "app_router_error",
+            "app_router_not_found",
+            "suspense_usage",
+            "server_component",
+            "server_only_import",
+            "client_only_import",
+            "forward_ref",
+            "react_portal",
+            "context_provider",
+            "generic_components",
+            "discriminated_props",
+            "as_prop_pattern",
+            "custom_hooks",
+        ]
 
-        # Check props interface
-        props_interface = re.search(
-            self.react_patterns["proper_props_interface"]["pattern"], content
-        )
-        if props_interface:
-            line_num = content[: props_interface.start()].count("\n") + 1
-            patterns.append(
-                PatternMatch(
-                    pattern_type=PatternType.COMPONENT,
-                    pattern_name="props_interface",
-                    file_path="",
-                    line_number=line_num,
-                    column=props_interface.start(),
-                    matched_text=props_interface.group(),
-                    confidence=0.9,
-                    context={"typing": "typescript_interface"},
-                )
-            )
+        for pattern_name in single_patterns:
+            if pattern_name in self.react_patterns:
+                pattern_config = self.react_patterns[pattern_name]
+                if "pattern" in pattern_config:
+                    matches = list(re.finditer(pattern_config["pattern"], content))
+                    for match in matches:
+                        line_num = content[: match.start()].count("\n") + 1
+                        patterns.append(
+                            PatternMatch(
+                                pattern_type=PatternType.COMPONENT,
+                                pattern_name=pattern_name,
+                                file_path="",
+                                line_number=line_num,
+                                column=match.start(),
+                                matched_text=match.group(),
+                                confidence=0.9,
+                                context=self._get_pattern_context(
+                                    pattern_name, match.group()
+                                ),
+                            )
+                        )
 
-        # Check React hooks usage
-        for hook_pattern in self.react_patterns["react_hooks"]["patterns"]:
-            hooks = list(re.finditer(hook_pattern, content))
-            for hook in hooks:
-                line_num = content[: hook.start()].count("\n") + 1
-                patterns.append(
-                    PatternMatch(
-                        pattern_type=PatternType.COMPONENT,
-                        pattern_name="react_hook",
-                        file_path="",
-                        line_number=line_num,
-                        column=hook.start(),
-                        matched_text=hook.group(),
-                        confidence=0.8,
-                        context={"hook_type": hook.group().split("(")[0]},
-                    )
-                )
+        # Multiple pattern checks (patterns with "patterns" array)
+        multi_patterns = ["react_hooks", "concurrent_features"]
 
-        # Check use client directive
-        use_client = re.search(
-            self.react_patterns["use_client_directive"]["pattern"], content
-        )
-        if use_client:
-            line_num = content[: use_client.start()].count("\n") + 1
-            patterns.append(
-                PatternMatch(
-                    pattern_type=PatternType.COMPONENT,
-                    pattern_name="use_client_directive",
-                    file_path="",
-                    line_number=line_num,
-                    column=use_client.start(),
-                    matched_text=use_client.group(),
-                    confidence=0.9,
-                    context={"component_type": "client"},
-                )
-            )
+        for pattern_name in multi_patterns:
+            if (
+                pattern_name in self.react_patterns
+                and "patterns" in self.react_patterns[pattern_name]
+            ):
+                for pattern in self.react_patterns[pattern_name]["patterns"]:
+                    matches = list(re.finditer(pattern, content))
+                    for match in matches:
+                        line_num = content[: match.start()].count("\n") + 1
+                        patterns.append(
+                            PatternMatch(
+                                pattern_type=PatternType.COMPONENT,
+                                pattern_name=pattern_name,
+                                file_path="",
+                                line_number=line_num,
+                                column=match.start(),
+                                matched_text=match.group(),
+                                confidence=0.8,
+                                context=self._get_pattern_context(
+                                    pattern_name, match.group()
+                                ),
+                            )
+                        )
 
         return patterns
+
+    def _get_pattern_context(
+        self, pattern_name: str, matched_text: str
+    ) -> dict[str, Any]:
+        """Get contextual information for a matched pattern."""
+        context = {"pattern_name": pattern_name}
+
+        if pattern_name == "function_component":
+            context["component_type"] = "function"
+        elif pattern_name == "proper_props_interface":
+            context["typing"] = "typescript_interface"
+        elif pattern_name == "use_client_directive":
+            context["component_type"] = "client"
+            context["nextjs_feature"] = "app_router"
+        elif pattern_name == "use_server_directive":
+            context["component_type"] = "server_action"
+            context["nextjs_feature"] = "app_router"
+        elif pattern_name.startswith("app_router_"):
+            context["nextjs_feature"] = "app_router"
+            context["special_file"] = pattern_name.replace("app_router_", "")
+        elif pattern_name == "server_component":
+            context["component_type"] = "server"
+            context["react_feature"] = "server_components"
+        elif pattern_name in ["server_only_import", "client_only_import"]:
+            context["boundary"] = pattern_name.replace("_import", "")
+        elif pattern_name == "suspense_usage":
+            context["react_feature"] = "concurrent_rendering"
+        elif pattern_name == "concurrent_features":
+            context["react_feature"] = "concurrent_features"
+            context["hook_type"] = (
+                matched_text.split("(")[0] if "(" in matched_text else matched_text
+            )
+        elif pattern_name == "react_hooks":
+            hook_name = (
+                matched_text.split("(")[0] if "(" in matched_text else matched_text
+            )
+            context["hook_type"] = hook_name
+            # Identify React 18+ hooks
+            if hook_name in [
+                "useId",
+                "useDeferredValue",
+                "useTransition",
+                "useSyncExternalStore",
+                "useInsertionEffect",
+            ]:
+                context["react_version"] = "18+"
+        elif pattern_name == "generic_components":
+            context["typescript_feature"] = "generics"
+        elif pattern_name == "custom_hooks":
+            context["hook_type"] = "custom"
+
+        return context
 
     def _analyze_performance_patterns(self, content: str) -> list[PatternMatch]:
         """Analyze performance optimization patterns."""
@@ -486,7 +640,7 @@ class QualityAnalyzer(BaseAnalyzer):
         return patterns
 
     def _analyze_error_handling(self, content: str) -> list[PatternMatch]:
-        """Analyze error handling patterns."""
+        """Analyze error handling patterns including async/await."""
         patterns = []
 
         # Check for try-catch blocks
@@ -508,31 +662,103 @@ class QualityAnalyzer(BaseAnalyzer):
                 )
             )
 
-        # Check for error boundaries
-        error_boundary = re.search(
-            r"componentDidCatch|getDerivedStateFromError", content
+        # Enhanced async error handling detection
+        async_try_catch = list(
+            re.finditer(
+                r"try\s*\{[^}]*await[^}]*\}\s*catch\s*\([^)]*\)\s*\{",
+                content,
+                re.DOTALL,
+            )
         )
-        if error_boundary:
-            line_num = content[: error_boundary.start()].count("\n") + 1
+        for match in async_try_catch:
+            line_num = content[: match.start()].count("\n") + 1
             patterns.append(
                 PatternMatch(
-                    pattern_type=PatternType.COMPONENT,
-                    pattern_name="error_boundary",
+                    pattern_type=PatternType.PERFORMANCE,
+                    pattern_name="async_error_handling",
                     file_path="",
                     line_number=line_num,
-                    column=error_boundary.start(),
-                    matched_text=error_boundary.group(),
+                    column=match.start(),
+                    matched_text="async try-catch with await",
                     confidence=0.9,
-                    context={"error_handling": "error_boundary"},
+                    context={"error_handling": "async_try_catch"},
                 )
             )
+
+        # Check for Promise error handling
+        promise_catch = list(re.finditer(r"\.catch\s*\(", content))
+        for match in promise_catch:
+            line_num = content[: match.start()].count("\n") + 1
+            patterns.append(
+                PatternMatch(
+                    pattern_type=PatternType.PERFORMANCE,
+                    pattern_name="promise_error_handling",
+                    file_path="",
+                    line_number=line_num,
+                    column=match.start(),
+                    matched_text=match.group(),
+                    confidence=0.7,
+                    context={"error_handling": "promise_catch"},
+                )
+            )
+
+        # Check for React Error Boundaries (modern pattern)
+        error_boundary_patterns = [
+            r"static\s+getDerivedStateFromError",
+            r"componentDidCatch",
+            r"ErrorBoundary",
+            r"useErrorBoundary",
+            r"withErrorBoundary",
+        ]
+
+        for pattern in error_boundary_patterns:
+            matches = list(re.finditer(pattern, content))
+            for match in matches:
+                line_num = content[: match.start()].count("\n") + 1
+                patterns.append(
+                    PatternMatch(
+                        pattern_type=PatternType.COMPONENT,
+                        pattern_name="react_error_boundary",
+                        file_path="",
+                        line_number=line_num,
+                        column=match.start(),
+                        matched_text=match.group(),
+                        confidence=0.9,
+                        context={"error_handling": "react_error_boundary"},
+                    )
+                )
+
+        # Check for proper resource cleanup patterns
+        cleanup_patterns = [
+            r"return\s*\(\s*\)\s*=>\s*\{",  # useEffect cleanup
+            r"controller\.abort\(\)",  # AbortController
+            r"clearInterval|clearTimeout",  # Timer cleanup
+            r"removeEventListener",  # Event cleanup
+        ]
+
+        for pattern in cleanup_patterns:
+            matches = list(re.finditer(pattern, content))
+            for match in matches:
+                line_num = content[: match.start()].count("\n") + 1
+                patterns.append(
+                    PatternMatch(
+                        pattern_type=PatternType.PERFORMANCE,
+                        pattern_name="resource_cleanup",
+                        file_path="",
+                        line_number=line_num,
+                        column=match.start(),
+                        matched_text=match.group(),
+                        confidence=0.8,
+                        context={"error_handling": "resource_cleanup"},
+                    )
+                )
 
         return patterns
 
     def _generate_react_recommendations(
         self, file_path: str, content: str
     ) -> list[Recommendation]:
-        """Generate React-specific recommendations."""
+        """Generate comprehensive React-specific recommendations."""
         recommendations = []
 
         # Check if it's a component file but doesn't use function components
@@ -563,6 +789,125 @@ class QualityAnalyzer(BaseAnalyzer):
                         rule_id="MISSING_PROPS_INTERFACE",
                     )
                 )
+
+            # Check for missing key props in list rendering
+            map_without_key = list(
+                re.finditer(
+                    r"\.map\s*\([^)]*\)\s*=>.*<\w+(?!\s*key=)", content, re.DOTALL
+                )
+            )
+            if map_without_key:
+                recommendations.append(
+                    Recommendation(
+                        severity=Severity.WARNING,
+                        category="react_performance",
+                        message="Add key prop to list items for better performance",
+                        file_path=file_path,
+                        line_number=content[: map_without_key[0].start()].count("\n")
+                        + 1,
+                        suggested_fix="Add key={item.id} or key={index} to list items",
+                        rule_id="MISSING_KEY_PROP",
+                    )
+                )
+
+            # Check for client-side features without 'use client' directive
+            client_features = [
+                r"useState\s*\(",
+                r"useEffect\s*\(",
+                r"onClick",
+                r"onSubmit",
+                r"window\.",
+                r"document\.",
+                r"localStorage",
+                r"sessionStorage",
+            ]
+
+            has_client_features = any(
+                re.search(pattern, content) for pattern in client_features
+            )
+            has_use_client = bool(re.search(r"['\"]use client['\"]", content))
+
+            if (
+                has_client_features
+                and not has_use_client
+                and "layout.tsx" not in file_path
+            ):
+                recommendations.append(
+                    Recommendation(
+                        severity=Severity.WARNING,
+                        category="nextjs_app_router",
+                        message="Component uses client features but missing 'use client' directive",
+                        file_path=file_path,
+                        line_number=1,
+                        suggested_fix="Add 'use client' at the top of the file",
+                        rule_id="MISSING_USE_CLIENT",
+                    )
+                )
+
+            # Check for server components that could benefit from async
+            is_server_component = not has_use_client and not bool(
+                re.search(r"['\"]use client['\"]", content)
+            )
+            has_data_fetching = bool(re.search(r"fetch\s*\(|await\s+", content))
+
+            if (
+                is_server_component
+                and has_data_fetching
+                and not bool(re.search(r"async\s+function", content))
+            ):
+                recommendations.append(
+                    Recommendation(
+                        severity=Severity.INFO,
+                        category="react_server_components",
+                        message="Consider making this a React Server Component with async data fetching",
+                        file_path=file_path,
+                        line_number=None,
+                        suggested_fix="Make component function async and fetch data directly",
+                        rule_id="CONSIDER_SERVER_COMPONENT",
+                    )
+                )
+
+            # Check for missing dependency arrays in hooks
+            use_effect_without_deps = list(
+                re.finditer(r"useEffect\s*\(\s*[^,)]+\s*\)", content)
+            )
+            if use_effect_without_deps:
+                recommendations.append(
+                    Recommendation(
+                        severity=Severity.WARNING,
+                        category="react_hooks",
+                        message="useEffect missing dependency array",
+                        file_path=file_path,
+                        line_number=content[: use_effect_without_deps[0].start()].count(
+                            "\n"
+                        )
+                        + 1,
+                        suggested_fix="Add dependency array as second parameter: [dependency1, dependency2]",
+                        rule_id="MISSING_USEEFFECT_DEPS",
+                    )
+                )
+
+            # Check for React 18 opportunities
+            if not bool(
+                re.search(
+                    r"Suspense|startTransition|useDeferredValue|useTransition", content
+                )
+            ):
+                has_expensive_operations = bool(
+                    re.search(r"\.filter\(.*\.map\(|\.sort\(|for\s*\(.*length", content)
+                )
+                if has_expensive_operations:
+                    recommendations.append(
+                        Recommendation(
+                            severity=Severity.INFO,
+                            category="react_concurrent",
+                            message="Consider using React 18 concurrent features for better performance",
+                            file_path=file_path,
+                            line_number=None,
+                            suggested_fix="Use useDeferredValue or startTransition for expensive operations",
+                            rule_id="CONSIDER_CONCURRENT_FEATURES",
+                        )
+                    )
 
         return recommendations
 
@@ -691,20 +1036,116 @@ class QualityAnalyzer(BaseAnalyzer):
     def _generate_error_handling_recommendations(
         self, file_path: str, content: str
     ) -> list[Recommendation]:
-        """Generate error handling recommendations."""
+        """Generate comprehensive error handling recommendations."""
         recommendations = []
 
-        # Check for async operations without error handling
-        if "async" in content and "await" in content and "try" not in content:
+        # Enhanced async error handling detection
+        awaits_in_file = list(re.finditer(r"await\s+", content))
+        try_blocks = list(re.finditer(r"try\s*\{", content))
+
+        # Check for async operations without proper error handling
+        if awaits_in_file and len(try_blocks) == 0:
+            recommendations.append(
+                Recommendation(
+                    severity=Severity.ERROR,
+                    category="async_error_handling",
+                    message="Async operations should include proper error handling",
+                    file_path=file_path,
+                    line_number=awaits_in_file[0].start() // len(content.split("\n")[0])
+                    + 1,
+                    suggested_fix="Wrap async operations in try-catch blocks",
+                    rule_id="MISSING_ASYNC_ERROR_HANDLING",
+                )
+            )
+
+        # Check for promises without catch handlers
+        promise_chains = list(re.finditer(r"\.then\s*\([^)]*\)", content))
+        promise_catches = list(re.finditer(r"\.catch\s*\([^)]*\)", content))
+
+        if promise_chains and len(promise_catches) < len(promise_chains):
             recommendations.append(
                 Recommendation(
                     severity=Severity.WARNING,
-                    category="error_handling",
-                    message="Async operations should include proper error handling",
+                    category="promise_error_handling",
+                    message="Promise chains should include .catch() error handlers",
                     file_path=file_path,
-                    line_number=None,
-                    suggested_fix="Wrap async operations in try-catch blocks",
-                    rule_id="MISSING_ASYNC_ERROR_HANDLING",
+                    line_number=promise_chains[0].start() // len(content.split("\n")[0])
+                    + 1,
+                    suggested_fix="Add .catch(error => { console.error(error); }) to promise chains",
+                    rule_id="MISSING_PROMISE_CATCH",
+                )
+            )
+
+        # Check for useEffect without cleanup when needed
+        use_effects = list(re.finditer(r"useEffect\s*\(", content))
+        cleanup_returns = list(re.finditer(r"return\s*\(\s*\)\s*=>", content))
+
+        # Patterns that likely need cleanup
+        needs_cleanup_patterns = [
+            r"setInterval|setTimeout",
+            r"addEventListener",
+            r"subscribe|subscribe\(",
+            r"new\s+WebSocket",
+            r"new\s+EventSource",
+        ]
+
+        has_cleanup_needs = any(
+            re.search(pattern, content) for pattern in needs_cleanup_patterns
+        )
+
+        if use_effects and has_cleanup_needs and len(cleanup_returns) == 0:
+            recommendations.append(
+                Recommendation(
+                    severity=Severity.WARNING,
+                    category="resource_cleanup",
+                    message="useEffect with side effects should include cleanup function",
+                    file_path=file_path,
+                    line_number=use_effects[0].start() // len(content.split("\n")[0])
+                    + 1,
+                    suggested_fix="Return cleanup function from useEffect: () => { /* cleanup code */ }",
+                    rule_id="MISSING_USEEFFECT_CLEANUP",
+                )
+            )
+
+        # Check for missing error boundaries in component hierarchies
+        if self._is_component_file(file_path):
+            has_error_boundary = bool(
+                re.search(
+                    r"ErrorBoundary|componentDidCatch|getDerivedStateFromError", content
+                )
+            )
+            has_async_components = bool(
+                re.search(r"Suspense|lazy\(|React\.lazy", content)
+            )
+
+            if has_async_components and not has_error_boundary:
+                recommendations.append(
+                    Recommendation(
+                        severity=Severity.INFO,
+                        category="react_error_handling",
+                        message="Components with async loading should be wrapped in Error Boundaries",
+                        file_path=file_path,
+                        line_number=None,
+                        suggested_fix="Wrap components in <ErrorBoundary> or implement error boundary",
+                        rule_id="MISSING_ERROR_BOUNDARY",
+                    )
+                )
+
+        # Check for fetch without error handling
+        fetch_calls = list(re.finditer(r"fetch\s*\(", content))
+        response_ok_checks = list(re.finditer(r"\.ok\b|response\.status", content))
+
+        if fetch_calls and len(response_ok_checks) == 0 and len(try_blocks) == 0:
+            recommendations.append(
+                Recommendation(
+                    severity=Severity.WARNING,
+                    category="api_error_handling",
+                    message="Fetch requests should include response status checking",
+                    file_path=file_path,
+                    line_number=fetch_calls[0].start() // len(content.split("\n")[0])
+                    + 1,
+                    suggested_fix="Check response.ok or response.status before processing",
+                    rule_id="MISSING_FETCH_ERROR_CHECK",
                 )
             )
 
@@ -739,35 +1180,167 @@ class QualityAnalyzer(BaseAnalyzer):
         recommendations: list[Recommendation],
         content: str,
     ) -> float:
-        """Calculate overall quality score."""
-        base_score = 0.6
+        """Calculate overall quality score with enhanced modern codebase scoring."""
+        # Improved base score for modern codebases
+        base_score = 0.7
 
-        # Bonus for good patterns
+        # Enhanced bonus for good patterns with weighted scoring
         pattern_bonuses = {
-            PatternType.COMPONENT: 0.05,
-            PatternType.PERFORMANCE: 0.1,
-            PatternType.SECURITY: 0.1,
-            PatternType.ACCESSIBILITY: 0.08,
+            PatternType.COMPONENT: 0.08,  # Increased for React components
+            PatternType.PERFORMANCE: 0.12,  # Higher weight for performance
+            PatternType.SECURITY: 0.15,  # Critical importance
+            PatternType.ACCESSIBILITY: 0.10,  # Increased for a11y compliance
+            PatternType.ARCHITECTURAL: 0.06,  # Architecture patterns
+            PatternType.TYPE_SAFETY: 0.08,  # TypeScript patterns
         }
 
+        # Calculate pattern bonuses with confidence weighting
+        pattern_score = 0.0
         for pattern in patterns_found:
-            bonus = pattern_bonuses.get(pattern.pattern_type, 0.02)
-            base_score += bonus * pattern.confidence
+            bonus = pattern_bonuses.get(pattern.pattern_type, 0.03)
+            pattern_score += bonus * pattern.confidence
 
-        # Penalty for issues
+        # Quality indicator bonuses for modern best practices
+        quality_bonuses = self._calculate_quality_bonuses(content)
+
+        # Penalty for issues with adjusted severity weighting
         severity_penalties = {
-            Severity.INFO: 0.02,
-            Severity.WARNING: 0.08,
-            Severity.ERROR: 0.15,
-            Severity.CRITICAL: 0.25,
+            Severity.INFO: 0.01,  # Reduced penalty for info
+            Severity.WARNING: 0.05,  # Reduced for warnings
+            Severity.ERROR: 0.12,  # Reduced but still significant
+            Severity.CRITICAL: 0.20,  # High penalty for critical issues
         }
 
+        penalty_score = 0.0
         for rec in recommendations:
-            base_score -= severity_penalties.get(rec.severity, 0.02)
+            penalty_score += severity_penalties.get(rec.severity, 0.01)
 
         # Additional scoring factors
-        lines = len(content.split("\n"))
-        if lines > 500:  # Penalty for very long files
-            base_score -= 0.05
+        complexity_penalty = self._calculate_complexity_penalty(content)
 
-        return max(0.0, min(1.0, base_score))
+        # Final score calculation
+        final_score = (
+            base_score
+            + pattern_score
+            + quality_bonuses
+            - penalty_score
+            - complexity_penalty
+        )
+
+        return max(0.0, min(1.0, final_score))
+
+    def _calculate_quality_bonuses(self, content: str) -> float:
+        """Calculate bonuses for modern quality indicators."""
+        bonuses = 0.0
+
+        # TypeScript strict mode indicators
+        if "strict" in content or "@typescript-eslint/strict" in content:
+            bonuses += 0.1
+
+        # Modern React patterns
+        if "use client" in content:
+            bonuses += 0.05
+        if "use server" in content:
+            bonuses += 0.05
+        if re.search(r"Suspense|ErrorBoundary|lazy\(", content):
+            bonuses += 0.08
+
+        # Test coverage indicators
+        if re.search(r"describe\(|test\(|it\(|expect\(", content):
+            bonuses += 0.1
+
+        # Security best practices
+        if re.search(r"helmet|cors|rate-?limit", content):
+            bonuses += 0.08
+
+        # Performance optimizations
+        if re.search(r"React\.memo|useCallback|useMemo|dynamic\(", content):
+            bonuses += 0.06
+
+        # Accessibility compliance
+        aria_count = len(re.findall(r"aria-\w+", content))
+        if aria_count > 0:
+            bonuses += min(0.1, aria_count * 0.02)
+
+        return bonuses
+
+    def _calculate_complexity_penalty(self, content: str) -> float:
+        """Calculate penalties based on code complexity."""
+        penalty = 0.0
+
+        lines = len(content.split("\n"))
+
+        # Graduated penalty for file length
+        if lines > 1000:
+            penalty += 0.08
+        elif lines > 500:
+            penalty += 0.04
+        elif lines > 300:
+            penalty += 0.02
+
+        # Complexity indicators
+        nesting_level = self._estimate_nesting_level(content)
+        if nesting_level > 5:
+            penalty += 0.06
+        elif nesting_level > 3:
+            penalty += 0.03
+
+        # Function length penalty
+        function_lengths = self._estimate_function_lengths(content)
+        avg_function_length = (
+            sum(function_lengths) / len(function_lengths) if function_lengths else 0
+        )
+        if avg_function_length > 50:
+            penalty += 0.05
+        elif avg_function_length > 30:
+            penalty += 0.02
+
+        return penalty
+
+    def _estimate_nesting_level(self, content: str) -> int:
+        """Estimate the maximum nesting level in the code."""
+        max_nesting = 0
+        current_nesting = 0
+
+        for line in content.split("\n"):
+            stripped = line.strip()
+            if not stripped or stripped.startswith("//") or stripped.startswith("/*"):
+                continue
+
+            # Count opening braces
+            current_nesting += stripped.count("{")
+            current_nesting -= stripped.count("}")
+
+            max_nesting = max(max_nesting, current_nesting)
+
+        return max_nesting
+
+    def _estimate_function_lengths(self, content: str) -> list[int]:
+        """Estimate function lengths in the code."""
+        function_lengths = []
+        lines = content.split("\n")
+        i = 0
+
+        while i < len(lines):
+            line = lines[i].strip()
+
+            # Look for function declarations
+            if re.search(
+                r"(function\s+\w+|const\s+\w+\s*=\s*.*=>|\w+\s*\(.*\)\s*\{)", line
+            ):
+                function_start = i
+                brace_count = line.count("{") - line.count("}")
+                i += 1
+
+                # Find function end
+                while i < len(lines) and brace_count > 0:
+                    current_line = lines[i]
+                    brace_count += current_line.count("{") - current_line.count("}")
+                    i += 1
+
+                if brace_count == 0:
+                    function_lengths.append(i - function_start)
+            else:
+                i += 1
+
+        return function_lengths
