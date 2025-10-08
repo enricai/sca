@@ -928,7 +928,7 @@ class PatternIndexer:
 
             # Create similarity matches
             similarity_matches = []
-            for score, idx in zip(scores[0], indices[0], strict=False):
+            for score, idx in zip(scores[0], indices[0]):
                 if idx == -1 or score < min_similarity:
                     continue
 
