@@ -333,18 +333,26 @@ class MultiDimensionalScorer:
             # Build pattern indices using the domain adherence analyzer
             domain_analyzer = self.analyzers["domain_adherence"]
             if isinstance(domain_analyzer, DomainAwareAdherenceAnalyzer):
-                domain_analyzer.build_pattern_indices(codebase_files)
+                domain_analyzer.build_pattern_indices(
+                    codebase_files, source_commit=target_commit
+                )
 
         except Exception as e:
             logger.error(f"Failed to build pattern indices: {e}")
 
     def analyze_commit(
-        self, commit_hash: str, progress_callback: Callable[[str], None] | None = None
+        self,
+        commit_hash: str,
+        pattern_index_commit: str = "parent",
+        progress_callback: Callable[[str], None] | None = None,
     ) -> dict[str, Any]:
         """Perform comprehensive multi-dimensional analysis of a commit.
 
         Args:
             commit_hash: Git commit hash to analyze
+            pattern_index_commit: Commit to use for building pattern indices.
+                - "parent" (default): Use the parent commit of commit_hash
+                - Any valid commit ref: "HEAD", "main", commit hash, etc.
             progress_callback: Optional callback to report analysis progress
 
         Returns:
@@ -352,12 +360,19 @@ class MultiDimensionalScorer:
         """
         start_time = time.time()
         logger.info(f"Starting multi-dimensional analysis for commit {commit_hash}")
+        logger.info(f"Pattern index commit specification: {pattern_index_commit}")
 
         # Helper function to report progress
         def report_progress(message: str) -> None:
             """Report progress if callback is available."""
             if progress_callback:
                 progress_callback(message)
+
+        # Resolve pattern index commit
+        resolved_index_commit = self._resolve_pattern_index_commit(
+            commit_hash, pattern_index_commit
+        )
+        logger.info(f"Resolved pattern index commit: {resolved_index_commit}")
 
         report_progress("Extracting files from commit...")
 
@@ -376,13 +391,31 @@ class MultiDimensionalScorer:
             and "domain_adherence" in self.analyzers
         ):
             domain_analyzer = self.analyzers["domain_adherence"]
-            if (
-                isinstance(domain_analyzer, DomainAwareAdherenceAnalyzer)
-                and not domain_analyzer._indices_built
-            ):
-                report_progress("Building pattern indices for domain-aware analysis...")
-                logger.info("Building pattern indices for domain-aware analysis")
-                self.build_pattern_indices_from_codebase()
+            if isinstance(domain_analyzer, DomainAwareAdherenceAnalyzer):
+                # Check if we need to build/rebuild indices
+                needs_rebuild = (
+                    not domain_analyzer._indices_built  # No indices built yet
+                    or domain_analyzer._indices_commit
+                    != resolved_index_commit  # Different commit
+                )
+
+                if needs_rebuild:
+                    if domain_analyzer._indices_commit:
+                        logger.info(
+                            f"Rebuilding indices: previous commit was {domain_analyzer._indices_commit}, "
+                            f"new commit is {resolved_index_commit}"
+                        )
+                    report_progress("Building pattern indices for domain-aware analysis...")
+                    logger.info(
+                        f"Building pattern indices from commit: {resolved_index_commit}"
+                    )
+                    self.build_pattern_indices_from_codebase(
+                        target_commit=resolved_index_commit
+                    )
+                else:
+                    logger.info(
+                        f"Reusing existing pattern indices from commit: {resolved_index_commit}"
+                    )
 
         # Run multi-dimensional analysis
         report_progress("Running multi-dimensional analysis...")
@@ -485,6 +518,56 @@ class MultiDimensionalScorer:
         except Exception as e:
             logger.error(f"Failed to extract commit files for {commit_hash}: {e}")
             raise ValueError(f"Invalid commit hash {commit_hash}: {e}") from e
+
+    def _resolve_pattern_index_commit(
+        self, commit_hash: str, pattern_index_commit: str
+    ) -> str:
+        """Resolve the pattern index commit reference to an actual commit hash.
+
+        Args:
+            commit_hash: The commit being analyzed
+            pattern_index_commit: The pattern index commit specification
+
+        Returns:
+            Resolved commit hash for building pattern indices
+
+        Raises:
+            ValueError: If the commit reference is invalid
+        """
+        if pattern_index_commit == "parent":
+            # Resolve to parent commit of the analyzed commit
+            try:
+                commit = self.repo.commit(commit_hash)
+                if commit.parents:
+                    resolved = commit.parents[0].hexsha
+                    logger.info(
+                        f"Resolved 'parent' to commit {resolved} (parent of {commit_hash})"
+                    )
+                    return resolved
+                else:
+                    # First commit has no parent - fall back to analyzing against empty tree
+                    logger.warning(
+                        f"Commit {commit_hash} has no parent (first commit). "
+                        "Falling back to HEAD for pattern indices."
+                    )
+                    return "HEAD"
+            except Exception as e:
+                raise ValueError(
+                    f"Failed to resolve parent commit for {commit_hash}: {e}"
+                ) from e
+        else:
+            # Use the provided commit reference as-is (could be "HEAD", "main", hash, etc.)
+            try:
+                # Validate that the commit exists
+                resolved_commit = self.repo.commit(pattern_index_commit)
+                logger.info(
+                    f"Using explicit pattern index commit: {resolved_commit.hexsha}"
+                )
+                return pattern_index_commit
+            except Exception as e:
+                raise ValueError(
+                    f"Invalid pattern index commit '{pattern_index_commit}': {e}"
+                ) from e
 
     def _should_exclude_file(self, file_path: str) -> bool:
         """Check if a file should be excluded from analysis."""

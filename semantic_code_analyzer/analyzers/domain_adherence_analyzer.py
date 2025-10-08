@@ -177,8 +177,9 @@ class DomainAwareAdherenceAnalyzer(BaseAnalyzer):
             "domain_confidence_threshold", 0.8
         )
 
-        # Track if indices have been built
+        # Track if indices have been built and from which commit
         self._indices_built: set[str] = set()
+        self._indices_commit: str | None = None
 
         report_progress("Domain adherence analyzer ready!")
 
@@ -323,17 +324,22 @@ class DomainAwareAdherenceAnalyzer(BaseAnalyzer):
             improvement_suggestions=improvement_suggestions,
         )
 
-    def build_pattern_indices(self, codebase_files: dict[str, str]) -> None:
+    def build_pattern_indices(
+        self, codebase_files: dict[str, str], source_commit: str | None = None
+    ) -> None:
         """Build pattern indices for all domains from a codebase.
 
         Args:
             codebase_files: Dictionary mapping file paths to their content
+            source_commit: Commit hash these files were extracted from (for tracking)
         """
         if self.pattern_indexer is None:
             logger.warning("Pattern indexer not available. Skipping index building.")
             return
 
-        logger.info(f"Building pattern indices for {len(codebase_files)} files")
+        logger.info(
+            f"Building pattern indices for {len(codebase_files)} files from commit {source_commit}"
+        )
 
         # Classify all files by domain
         domain_files: dict[str, dict[str, str]] = {}
@@ -379,8 +385,10 @@ class DomainAwareAdherenceAnalyzer(BaseAnalyzer):
             except Exception as e:
                 logger.error(f"Failed to build index for domain {domain_str}: {e}")
 
+        # Store which commit these indices were built from
+        self._indices_commit = source_commit
         logger.info(
-            f"Successfully built indices for domains: {list(self._indices_built)}"
+            f"Successfully built indices for domains: {list(self._indices_built)} from commit {source_commit}"
         )
 
     def _calculate_detailed_adherence_scores(

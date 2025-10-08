@@ -76,11 +76,17 @@ pip install -e .
 ### Analyze a Single Commit
 
 ```bash
-# Analyze latest commit
+# Analyze latest commit (compares against parent commit by default)
 sca-analyze analyze HEAD
 
-# Analyze specific commit
+# Analyze specific commit (compares against its parent)
 sca-analyze analyze abc123def
+
+# Compare against a specific commit (e.g., main branch)
+sca-analyze analyze abc123def --pattern-index-commit main
+
+# Compare against current HEAD (old default behavior)
+sca-analyze analyze abc123def --pattern-index-commit HEAD
 
 # Custom weights (emphasize quality)
 sca-analyze analyze abc123def \
@@ -178,9 +184,16 @@ for feedback in results['actionable_feedback']:
   pattern indices
 - **Pattern Matching**: Finds similar high-quality patterns in your existing
   codebase
+- **Parent Commit Comparison**: By default, compares new code against patterns
+  from the commit **before** it was made (ensures fair adherence measurement)
 - **Context-Aware Recommendations**: Suggestions based on actual patterns from
   your domain-specific code
 - **Confidence Scoring**: Measures certainty of pattern matches and domain classification
+
+**Pattern Index Commit Options:**
+- `--pattern-index-commit parent` (default): Compare against the parent commit's codebase
+- `--pattern-index-commit main`: Compare against the main branch patterns
+- `--pattern-index-commit HEAD`: Compare against current repository state
 
 ## 🎛️ Configuration
 

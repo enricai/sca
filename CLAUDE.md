@@ -21,6 +21,8 @@ code in this repository.
 - With domain adherence: `sca-analyze analyze HEAD --domain-adherence-weight 0.25`
 - Custom configuration: `sca-analyze analyze HEAD \
   --similarity-threshold 0.4 --max-similar-patterns 15`
+- Compare against specific commit: `sca-analyze analyze HEAD --pattern-index-commit main`
+- Compare against parent (default): `sca-analyze analyze HEAD --pattern-index-commit parent`
 - Disable AI features: `sca-analyze analyze HEAD --disable-domain-adherence --disable-pattern-indices`
 
 ## MANDATORY Requirements (MUST follow)

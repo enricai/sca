@@ -108,14 +108,29 @@ CREATE TABLE users (
 
             mock_tree.traverse.return_value = mock_files
             mock_commit.tree = mock_tree
-            mock_repo.commit.return_value = mock_commit
 
             # Mock diff for commit analysis
             mock_diff_item = Mock()
             mock_diff_item.change_type = "A"  # Added file
             mock_diff_item.b_path = "src/components/NewButton.tsx"
-            mock_commit.parents = [Mock()]  # Has parent commit
-            mock_commit.parents[0].diff.return_value = [mock_diff_item]
+
+            # Mock parent commit with hexsha
+            mock_parent = Mock()
+            mock_parent.hexsha = "parent123abc"
+            mock_parent.tree = mock_tree  # Parent has same tree for pattern building
+            mock_parent.diff.return_value = [mock_diff_item]
+
+            mock_commit.parents = [mock_parent]  # Has parent commit
+            mock_commit.hexsha = "abc123def"
+
+            # Mock commit lookup to return appropriate commits
+            def mock_commit_lookup(ref: str) -> Mock:
+                if ref == "parent123abc":
+                    return mock_parent
+                else:
+                    return mock_commit
+
+            mock_repo.commit.side_effect = mock_commit_lookup
 
             # Mock commit tree access for file content
             def mock_tree_access(self: Any, path: str) -> Any:
@@ -227,8 +242,8 @@ export default NewButton;
         with tempfile.TemporaryDirectory() as temp_dir:
             scorer = MultiDimensionalScorer(domain_aware_config, temp_dir)
 
-            # Build pattern indices
-            scorer.build_pattern_indices_from_codebase("HEAD")
+            # Build pattern indices from parent commit
+            scorer.build_pattern_indices_from_codebase("parent123abc")
 
             # Should have built indices for the domain adherence analyzer
             domain_analyzer = cast(

@@ -231,6 +231,11 @@ def cli(ctx: click.Context, verbose: bool, debug: bool) -> None:
     default="auto",
     help="Hardware device preference for AI model acceleration (auto, cpu, mps, cuda)",
 )
+@click.option(
+    "--pattern-index-commit",
+    default="parent",
+    help="Git commit to use for building pattern indices (default: 'parent' - the commit before the one being analyzed, or specify commit hash like 'HEAD', 'main', etc.)",
+)
 @click.pass_context
 def analyze(
     ctx: click.Context,
@@ -251,6 +256,7 @@ def analyze(
     disable_pattern_indices: bool,
     max_recommendations: int,
     device: str,
+    pattern_index_commit: str,
 ) -> None:
     """Perform multi-dimensional analysis on a commit."""
     console.print(f"[bold blue]Analyzing commit: {commit_hash}[/bold blue]")
@@ -430,7 +436,9 @@ def analyze(
         start_time = time.time()
 
         results = scorer.analyze_commit(
-            commit_hash, progress_callback=progress_callback
+            commit_hash,
+            pattern_index_commit=pattern_index_commit,
+            progress_callback=progress_callback,
         )
 
         analysis_time = time.time() - start_time
