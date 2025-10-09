@@ -701,13 +701,43 @@ class MultiDimensionalScorer:
         }
 
         # Calculate average scores for each dimension
+        # Filter out unknown domain files to avoid skewing results
         dimensional_scores = {}
         for analyzer_name, results in dimensional_results.items():
             if results:  # Only include if we have results
-                file_scores = [result.score for result in results.values()]
-                dimensional_scores[analyzer_name] = (
-                    sum(file_scores) / len(file_scores) if file_scores else 0.0
-                )
+                # Filter out files with unknown domain
+                valid_results = {}
+                excluded_files = []
+
+                for file_path, result in results.items():
+                    file_domain = result.metrics.get("domain", "unknown")
+                    if file_domain == "unknown":
+                        excluded_files.append(file_path)
+                        logger.debug(
+                            f"Excluding unknown domain file from averaging: {file_path} (score: {result.score:.2f})"
+                        )
+                    else:
+                        valid_results[file_path] = result
+
+                # Log excluded files for visibility
+                if excluded_files:
+                    logger.info(
+                        f"{analyzer_name}: Excluded {len(excluded_files)} unknown domain files from score: {excluded_files}"
+                    )
+
+                # Calculate average only from valid files
+                if valid_results:
+                    file_scores = [result.score for result in valid_results.values()]
+                    dimensional_scores[analyzer_name] = (
+                        sum(file_scores) / len(file_scores) if file_scores else 0.0
+                    )
+                    logger.info(
+                        f"{analyzer_name}: Averaged {len(valid_results)} files (excluded {len(excluded_files)}), score: {dimensional_scores[analyzer_name]:.4f}"
+                    )
+                else:
+                    logger.warning(
+                        f"{analyzer_name}: All files were unknown domain, skipping"
+                    )
 
         # Aggregate using the weighted aggregator
         return self.aggregator.aggregate(dimensional_scores, weights)

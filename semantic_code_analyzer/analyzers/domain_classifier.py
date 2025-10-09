@@ -288,12 +288,10 @@ class DomainClassifier(BaseAnalyzer):
             },
             ArchitecturalDomain.TESTING: {
                 "path_patterns": [
-                    r".*test.*\.(ts|tsx|js|jsx|py)$",
-                    r".*spec.*\.(ts|tsx|js|jsx|py)$",
-                    r".*/tests?/.*",
-                    r".*/__tests__/.*",
-                    r".*\.test\.(ts|tsx|js|jsx|py)$",
-                    r".*\.spec\.(ts|tsx|js|jsx|py)$",
+                    # Specific test file patterns (avoid false positives like "Testimonial")
+                    r".*\.test\.(ts|tsx|js|jsx|py)$",  # file.test.tsx
+                    r".*\.spec\.(ts|tsx|js|jsx|py)$",  # file.spec.tsx
+                    r"(^|.*/)(tests?|__tests__)(/.*)?$",  # tests/, test/, __tests__ dir
                     r".*cypress.*",
                     r".*playwright.*",
                     r".*e2e.*",
