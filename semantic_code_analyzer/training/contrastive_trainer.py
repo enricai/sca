@@ -375,6 +375,15 @@ class CodeStyleTrainer:
                 f"Epoch {epoch + 1} - Train Loss: {train_loss:.4f}, Val Loss: {val_loss:.4f}"
             )
 
+            # Log MPS status after each epoch if on MPS device
+            if self.device.type == "mps":
+                try:
+                    logger.info(
+                        f"Epoch {epoch + 1} - MPS device active, training completed successfully"
+                    )
+                except Exception as e:
+                    logger.debug(f"Could not log MPS status: {e}")
+
         return stats
 
     def _train_epoch(
@@ -443,6 +452,13 @@ class CodeStyleTrainer:
             num_batches += 1
 
             progress_bar.set_postfix({"loss": loss.item()})
+
+        # Synchronize MPS if applicable
+        if self.device.type == "mps":
+            try:
+                torch.mps.synchronize()
+            except Exception as e:
+                logger.debug(f"MPS synchronize failed: {e}")
 
         return total_loss / num_batches
 

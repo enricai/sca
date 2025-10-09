@@ -230,30 +230,42 @@ How would this feature work? Any API design ideas?
    - Performance anti-pattern recognition
    - Accessibility analysis enhancement
    - Code complexity metrics
+   - Domain classification improvements
 
-3. **Testing**
+3. **Fine-Tuning & ML**
+   - Training optimization and performance
+   - Custom loss functions for contrastive learning
+   - Data augmentation strategies
+   - Model compression and quantization
+   - Better pair generation algorithms
+
+4. **Testing**
    - Integration tests
    - Performance benchmarks
    - Edge case coverage
    - Mock improvements
+   - Fine-tuning tests
 
-4. **Documentation**
+5. **Documentation**
    - API documentation
    - Usage examples
    - Best practices guides
    - Troubleshooting guides
+   - Fine-tuning tutorials
 
-5. **Developer Experience**
+6. **Developer Experience**
    - IDE integrations
    - CLI improvements
    - Error messages
    - Output formatting
+   - Training progress visualization
 
-6. **Infrastructure**
+7. **Infrastructure**
    - CI/CD improvements
    - Package distribution
    - Security enhancements
    - Configuration management
+   - Model registry and versioning
 
 ## 🏗️ Architecture Overview
 
@@ -284,8 +296,9 @@ semantic_code_analyzer/
 │   └── weighted_aggregator.py       # Mathematical aggregation
 └── training/                # Fine-tuning support
     ├── __init__.py
-    ├── data_preparation.py  # Training data preparation
-    └── model_trainer.py     # GraphCodeBERT fine-tuning
+    ├── data_preparation.py  # Training data preparation from git commits
+    ├── pair_generation.py   # Contrastive learning pair generation
+    └── contrastive_trainer.py  # GraphCodeBERT fine-tuning with contrastive loss
 ```
 
 ### Key Design Principles

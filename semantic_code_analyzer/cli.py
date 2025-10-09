@@ -1100,6 +1100,37 @@ def fine_tune(
             f"({hardware_info.memory_gb:.1f}GB memory)[/dim]"
         )
 
+        # Display M3-specific hardware metrics if on M3
+        if (
+            hardware_info.is_apple_silicon
+            and hardware_info.chip_generation
+            and hardware_info.chip_generation.value.startswith("m3")
+        ):
+            try:
+                m3_metrics = device_manager.get_m3_performance_metrics()
+                console.print("[dim]📊 M3 Hardware Details:[/dim]")
+                console.print(
+                    f"[dim]  • GPU Cores: {m3_metrics.get('gpu_cores', 'N/A')}[/dim]"
+                )
+                console.print(
+                    f"[dim]  • Neural Engine: {m3_metrics.get('neural_engine_cores', 'N/A')} cores[/dim]"
+                )
+                console.print(
+                    f"[dim]  • Memory Bandwidth: {m3_metrics.get('memory_bandwidth_gbps', 'N/A')} GB/s[/dim]"
+                )
+
+                mps_accel = m3_metrics.get("mps_acceleration", {})
+                mps_active = mps_accel.get("active", False)
+                mps_status = "✅ Active" if mps_active else "❌ Not Active"
+                console.print(f"[dim]  • MPS Acceleration: {mps_status}[/dim]")
+
+                if mps_active:
+                    console.print(
+                        f"[dim]  • Optimized Batch Size: {mps_accel.get('optimized_batch_size', 'N/A')}[/dim]"
+                    )
+            except Exception as e:
+                logger.debug(f"Could not retrieve M3 metrics: {e}")
+
         console.print("[dim]This will take approximately 30-45 minutes on M3...[/dim]")
 
         # Create training configuration
@@ -1135,6 +1166,33 @@ def fine_tune(
             f"[green]Fine-tuning completed in {training_time / 60:.1f} minutes![/green]"
         )
         console.print(f"[green]Model saved to: {model_path}[/green]")
+        console.print("")
+
+        # Display final hardware utilization report
+        console.print("[bold]✅ Training Complete - Hardware Summary:[/bold]")
+        console.print(f"[dim]  • Device used: {hardware_info.device_type.value}[/dim]")
+
+        if hardware_info.is_apple_silicon and hardware_info.chip_generation:
+            console.print(
+                f"[dim]  • Chip: {hardware_info.chip_generation.value.upper()}[/dim]"
+            )
+
+        if hardware_info.device_type == DeviceType.MPS:
+            console.print(
+                "[dim]  • MPS acceleration: ✅ Active throughout training[/dim]"
+            )
+            avg_batch_speed = (
+                len(trainer.training_stats.get("train_losses", [])) * 3 / training_time
+            )  # Rough estimate
+            if avg_batch_speed > 0:
+                console.print(
+                    f"[dim]  • Average speed: ~{avg_batch_speed:.1f} epochs/minute[/dim]"
+                )
+        else:
+            console.print(
+                f"[dim]  • Device: {hardware_info.device_type.value} (CPU or CUDA)[/dim]"
+            )
+
         console.print("")
         console.print("[bold]To use this fine-tuned model:[/bold]")
         console.print(

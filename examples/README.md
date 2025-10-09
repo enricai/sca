@@ -49,18 +49,36 @@ python advanced_usage.py
 ```python
 from semantic_code_analyzer import MultiDimensionalScorer, EnhancedScorerConfig
 
-# Multi-dimensional analysis with default configuration
-config = EnhancedScorerConfig()
+# Embeddings-only analysis (default mode, framework-agnostic)
+config = EnhancedScorerConfig(
+    enable_architectural_analysis=False,
+    enable_quality_analysis=False,
+    enable_typescript_analysis=False,
+    enable_framework_analysis=False,
+    enable_domain_adherence_analysis=True,  # Pure semantic embeddings
+    build_pattern_indices=True
+)
 scorer = MultiDimensionalScorer(config, repo_path="/path/to/repo")
 results = scorer.analyze_commit("commit_hash")
 
 print(f"Overall Adherence: {results['overall_adherence']:.3f}")
 print(f"Domain Adherence: {results['dimensional_scores']['domain_adherence']:.3f}")
 
-# Basic analysis without AI features
+# Multi-dimensional analysis with all analyzers
 config = EnhancedScorerConfig(
-    enable_domain_adherence_analysis=False,
-    build_pattern_indices=False
+    enable_architectural_analysis=True,
+    enable_quality_analysis=True,
+    enable_typescript_analysis=True,
+    enable_framework_analysis=True,
+    enable_domain_adherence_analysis=True
+)
+scorer = MultiDimensionalScorer(config, repo_path="/path/to/repo")
+results = scorer.analyze_commit("commit_hash")
+
+# Use a fine-tuned model
+config = EnhancedScorerConfig(
+    enable_domain_adherence_analysis=True,
+    fine_tuned_model_commit="abc123d"  # Commit hash or model name
 )
 scorer = MultiDimensionalScorer(config, repo_path="/path/to/repo")
 results = scorer.analyze_commit("commit_hash")
@@ -82,6 +100,48 @@ config = EnhancedScorerConfig(
 )
 
 scorer = MultiDimensionalScorer(config, repo_path="/path/to/repo")
+```
+
+### Fine-Tuning Models
+
+```python
+from semantic_code_analyzer.training import (
+    CodeStyleTrainer,
+    FineTuningConfig,
+    CodeDatasetPreparator
+)
+
+# Configure fine-tuning
+config = FineTuningConfig(
+    model_name="microsoft/graphcodebert-base",
+    epochs=3,
+    batch_size=8,
+    learning_rate=5e-5,
+    device="mps",  # or "cuda", "cpu", "auto"
+    output_dir="./fine-tuned-models",
+    max_length=512
+)
+
+# Prepare training data from commit
+preparator = CodeDatasetPreparator(repo_path=".")
+dataset = preparator.prepare_dataset_from_commit(
+    commit_hash="HEAD",
+    max_files=1000
+)
+
+# Train the model
+trainer = CodeStyleTrainer(config)
+model_path = trainer.train(dataset, output_name="my-custom-model")
+
+print(f"Fine-tuned model saved to: {model_path}")
+
+# Use the fine-tuned model for analysis
+scorer_config = EnhancedScorerConfig(
+    enable_domain_adherence_analysis=True,
+    fine_tuned_model_commit="my-custom-model"
+)
+scorer = MultiDimensionalScorer(scorer_config, repo_path=".")
+results = scorer.analyze_commit("new_commit_hash")
 ```
 
 ### Batch Analysis
@@ -114,27 +174,68 @@ fast_config = ScorerConfig(
 ### Single Commit Analysis
 
 ```bash
-# Basic multi-dimensional analysis
+# Basic embeddings-only analysis (default mode)
 sca-analyze analyze HEAD
 
-# With custom weights
+# Enable verbose logging for detailed output
+sca-analyze analyze HEAD --verbose
+
+# Multi-dimensional analysis with regex analyzers
+sca-analyze analyze HEAD --enable-regex-analyzers
+
+# With custom weights (multi-dimensional mode)
 sca-analyze analyze abc123def456 \
+  --enable-regex-analyzers \
   --architectural-weight 0.25 \
   --quality-weight 0.30 \
   --framework-weight 0.15 \
   --domain-adherence-weight 0.15 \
   --output results.json
 
-# Enable AI-enhanced domain adherence
+# Embeddings-only with custom similarity settings
 sca-analyze analyze abc123def456 \
-  --domain-adherence-weight 0.25 \
   --similarity-threshold 0.4 \
   --max-similar-patterns 15
+
+# Compare against specific commit (default is parent)
+sca-analyze analyze abc123def456 --pattern-index-commit main
+
+# Specify hardware acceleration device
+sca-analyze analyze HEAD --device mps  # Options: auto, cpu, mps, cuda
+
+# Use a fine-tuned model
+sca-analyze analyze HEAD --fine-tuned-model abc123d
 
 # Disable AI features for speed
 sca-analyze analyze abc123def456 \
   --disable-domain-adherence \
   --disable-pattern-indices
+```
+
+### Fine-Tuning (CLI)
+
+```bash
+# Fine-tune GraphCodeBERT on your codebase
+sca-analyze fine-tune HEAD --repo-path . --epochs 3 --batch-size 8
+
+# Fine-tune with custom settings
+sca-analyze fine-tune HEAD \
+  --repo-path ~/src/myproject \
+  --epochs 5 \
+  --batch-size 16 \
+  --learning-rate 5e-5 \
+  --max-files 1000 \
+  --device mps \
+  --output-name my-custom-model
+
+# Fine-tune on CPU (if GPU not available)
+sca-analyze fine-tune HEAD --device cpu
+
+# Use the fine-tuned model
+sca-analyze analyze HEAD --fine-tuned-model abc123d
+
+# Fine-tune with verbose output
+sca-analyze fine-tune HEAD --verbose
 ```
 
 ### Multi-Commit Analysis
@@ -152,6 +253,9 @@ sca-analyze batch --branch develop --count 5 --output batch_results.json
 ```bash
 # Compare two commits
 sca-analyze compare abc123 def456 --output comparison.json
+
+# Compare with hardware acceleration
+sca-analyze compare abc123 def456 --device mps --output comparison.json
 ```
 
 ### Repository Information
@@ -222,6 +326,24 @@ benchmark_config = ScorerConfig(
 | 0.2-0.4 | Low - Different patterns from existing code |
 | 0.0-0.2 | Very Low - Significantly different approach |
 
+### Domain-Stratified Scores
+
+The analyzer provides two important scores in embeddings-only mode:
+
+- **Overall Adherence**: Domain-weighted score across all file types
+- **Code-Focused Score**: Weighted toward implementation code
+  (backend/frontend), excluding config/docs
+
+Domain weights:
+
+- Backend: 1.0 (highest priority)
+- Frontend: 1.0 (highest priority)
+- Testing: 0.8
+- Database: 0.7
+- Infrastructure: 0.5
+- Configuration: 0.3
+- Documentation: 0.2
+
 ### Example Output
 
 ```json
@@ -230,24 +352,34 @@ benchmark_config = ScorerConfig(
     "hash": "abc123",
     "message": "Add user authentication",
     "author": "John Doe",
-    "files_changed": ["auth.py", "models.py"]
+    "files_changed": ["auth.py", "models.py", "README.md"]
   },
-  "aggregate_scores": {
-    "max_similarity": 0.756,
-    "mean_similarity": 0.623,
-    "median_similarity": 0.698
+  "overall_adherence": 0.782,
+  "code_focused_score": 0.854,
+  "confidence": 0.923,
+  "dimensional_scores": {
+    "domain_adherence": 0.782
   },
-  "file_results": {
-    "auth.py": {
-      "overall_similarity": {
-        "max_similarity": 0.756,
-        "mean_similarity": 0.623
-      },
-      "most_similar_files": [
-        {"file_path": "login.py", "similarity_score": 0.756},
-        {"file_path": "security.py", "similarity_score": 0.698}
+  "domain_breakdown": {
+    "backend": {
+      "file_count": 2,
+      "weighted_score": 0.854,
+      "files": [
+        {"path": "auth.py", "score": 0.876, "domain": "backend"},
+        {"path": "models.py", "score": 0.832, "domain": "backend"}
+      ]
+    },
+    "documentation": {
+      "file_count": 1,
+      "weighted_score": 0.412,
+      "files": [
+        {"path": "README.md", "score": 0.412, "domain": "documentation"}
       ]
     }
+  },
+  "pattern_analysis": {
+    "total_patterns_found": 24,
+    "pattern_confidence_avg": 0.847
   }
 }
 ```
@@ -348,7 +480,28 @@ scorer.clear_caches()
 
 - Verify you're on Apple Silicon
 - Check PyTorch MPS support: `torch.backends.mps.is_available()`
-- Fall back to CPU: `use_mps=False`
+- Fall back to CPU: `use_mps=False` or `--device cpu`
+
+#### "Fine-tuning out of memory"
+
+- Reduce batch size: `--batch-size 4`
+- Reduce max files: `--max-files 500`
+- Use CPU: `--device cpu`
+- Close other memory-intensive applications
+
+#### "Fine-tuning taking too long"
+
+- Reduce epochs: `--epochs 2`
+- Reduce max files: `--max-files 500`
+- Use GPU acceleration: `--device mps` or `--device cuda`
+- Training typically takes 30-45 minutes on M3
+
+#### "Fine-tuned model not found"
+
+- Verify model was saved successfully
+- Check model directory: `~/.semantic-code-analyzer/fine-tuned-models/`
+- Use correct commit hash or model name
+- Re-run fine-tuning if model is missing
 
 ### Debug Mode
 
@@ -358,6 +511,12 @@ logging.basicConfig(level=logging.DEBUG)
 
 # Enable verbose output
 config = ScorerConfig(detailed_output=True)
+```
+
+```bash
+# CLI verbose mode
+sca-analyze analyze HEAD --verbose
+sca-analyze fine-tune HEAD --verbose
 ```
 
 ## 📚 Additional Resources
