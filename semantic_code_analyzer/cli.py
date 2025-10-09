@@ -148,12 +148,11 @@ def _run_pre_analysis_health_check(
 
 @click.group()
 @click.option("--verbose", "-v", is_flag=True, help="Enable verbose logging")
-@click.option("--debug", is_flag=True, help="Enable debug logging")
 @click.pass_context
-def cli(ctx: click.Context, verbose: bool, debug: bool) -> None:
+def cli(ctx: click.Context, verbose: bool) -> None:
     """Multi-Dimensional Code Analyzer for comprehensive code quality analysis."""
     # Set up logging
-    level = logging.DEBUG if debug else (logging.INFO if verbose else logging.WARNING)
+    level = logging.DEBUG if verbose else logging.WARNING
     logging.basicConfig(
         level=level, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
     )
@@ -161,7 +160,6 @@ def cli(ctx: click.Context, verbose: bool, debug: bool) -> None:
     # Ensure context object exists
     ctx.ensure_object(dict)
     ctx.obj["verbose"] = verbose
-    ctx.obj["debug"] = debug
 
 
 @cli.command()
@@ -272,7 +270,6 @@ def analyze(
     logger.info(f"Repository path: {repo_path}")
     logger.info(f"Output file: {output}")
     logger.info(f"Device preference: {device}")
-    logger.info(f"Debug mode: {ctx.obj['debug']}")
     logger.info(f"Verbose mode: {ctx.obj['verbose']}")
 
     # Default to embeddings-only mode (disable regex analyzers)
@@ -508,7 +505,7 @@ def analyze(
 
     except Exception as e:
         console.print(f"[red]Error during analysis: {e}[/red]")
-        if ctx.obj["debug"]:
+        if ctx.obj["verbose"]:
             console.print_exception()
         sys.exit(1)
 
