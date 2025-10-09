@@ -226,7 +226,7 @@ class DomainAwareAdherenceAnalyzer(BaseAnalyzer):
 
         # Generate recommendations
         recommendations = self._generate_adherence_recommendations(
-            adherence_analysis, file_path
+            adherence_analysis, file_path, content
         )
 
         # Calculate overall score
@@ -563,13 +563,14 @@ class DomainAwareAdherenceAnalyzer(BaseAnalyzer):
         return patterns
 
     def _generate_adherence_recommendations(
-        self, analysis: AdherenceAnalysisResult, file_path: str
+        self, analysis: AdherenceAnalysisResult, file_path: str, content: str
     ) -> list[Recommendation]:
         """Generate recommendations based on adherence analysis.
 
         Args:
             analysis: Adherence analysis result
             file_path: File path being analyzed
+            content: File content
 
         Returns:
             List of Recommendation objects
@@ -620,7 +621,7 @@ class DomainAwareAdherenceAnalyzer(BaseAnalyzer):
 
             # Get detailed diagnostics for enhanced feedback
             enhanced_recommendation = self._generate_enhanced_domain_recommendation(
-                file_path, analysis.domain_classification, severity
+                file_path, analysis.domain_classification, severity, content
             )
             recommendations.append(enhanced_recommendation)
 
@@ -724,6 +725,7 @@ class DomainAwareAdherenceAnalyzer(BaseAnalyzer):
         file_path: str,
         classification: DomainClassificationResult,
         severity: Severity,
+        content: str,
     ) -> Recommendation:
         """Generate enhanced domain classification recommendation with detailed diagnostics.
 
@@ -731,25 +733,18 @@ class DomainAwareAdherenceAnalyzer(BaseAnalyzer):
             file_path: Path to the file
             classification: Domain classification result
             severity: Severity level for the recommendation
+            content: File content (from git commit, not disk)
 
         Returns:
             Enhanced recommendation with detailed diagnostics
         """
         # Get diagnostic details from the domain classifier
         try:
-            # Extract file content to get diagnostics
             from pathlib import Path
 
-            file_content = ""
-            try:
-                file_content = Path(file_path).read_text(
-                    encoding="utf-8", errors="ignore"
-                )
-            except Exception as e:
-                logger.warning(f"Could not read file {file_path} for diagnostics: {e}")
-
+            # Use provided content instead of reading from disk
             diagnostics = self.domain_classifier.get_classification_diagnostics(
-                file_path, file_content
+                file_path, content
             )
             # Ensure diagnostics is a dictionary
             if not isinstance(diagnostics, dict):

@@ -319,7 +319,7 @@ export default Button;
         ]
 
         recommendations = analyzer._generate_adherence_recommendations(
-            analysis_result, "test.tsx"
+            analysis_result, "test.tsx", "test content"
         )
 
         assert len(recommendations) > 0
@@ -449,7 +449,10 @@ export default Button;
         mock_classifier.get_classification_diagnostics.return_value = {}
 
         recommendation = analyzer._generate_enhanced_domain_recommendation(
-            "src/components/UserProfile.tsx", classification, Severity.WARNING
+            "src/components/UserProfile.tsx",
+            classification,
+            Severity.WARNING,
+            "mock file content",
         )
 
         assert recommendation.severity == Severity.WARNING
@@ -628,7 +631,10 @@ export default Button;
 
         # Test with non-existent file path
         recommendation = analyzer._generate_enhanced_domain_recommendation(
-            "/non/existent/file.tsx", classification, Severity.WARNING
+            "/non/existent/file.tsx",
+            classification,
+            Severity.WARNING,
+            "test content",
         )
 
         # Should handle the error gracefully and still generate recommendation
