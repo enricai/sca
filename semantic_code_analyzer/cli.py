@@ -741,6 +741,59 @@ def _display_results(results: dict[str, Any], verbose: bool = False) -> None:
         console.print("\n")
         console.print(domain_table)
 
+        # Show top files per domain (code domains only)
+        console.print("\n[bold]File Details by Domain:[/bold]")
+
+        code_domains = ["backend", "frontend", "testing", "database"]
+
+        for domain in code_domains:
+            if domain in domain_breakdown:
+                stats = domain_breakdown[domain]
+                files = stats.get("files", [])
+                scores = stats.get("scores", [])
+
+                if not files:
+                    continue
+
+                # Pair files with scores and sort by score (descending)
+                file_score_pairs = list(zip(files, scores, strict=True))
+                file_score_pairs.sort(key=lambda x: x[1], reverse=True)
+
+                # Show top 5 (or all if fewer)
+                display_count = min(5, len(file_score_pairs))
+
+                console.print(
+                    f"\n  [{domain.title()}] - Top {display_count}/{len(files)} Files"
+                )
+
+                for i, (file_path, score) in enumerate(
+                    file_score_pairs[:display_count], 1
+                ):
+                    score_color = _get_score_color(score)
+                    # Truncate long paths for readability
+                    display_path = (
+                        file_path if len(file_path) < 60 else "..." + file_path[-57:]
+                    )
+                    console.print(
+                        f"    {i}. [{score_color}]{score:.3f}[/{score_color}] - {display_path}"
+                    )
+
+                # If there are more files and lowest score is concerning, show it
+                if (
+                    len(file_score_pairs) > display_count
+                    and file_score_pairs[-1][1] < 0.5
+                ):
+                    lowest_file = file_score_pairs[-1][0]
+                    lowest_score = file_score_pairs[-1][1]
+                    display_lowest = (
+                        lowest_file
+                        if len(lowest_file) < 50
+                        else "..." + lowest_file[-47:]
+                    )
+                    console.print(
+                        f"    [dim]... (lowest: {display_lowest} = {lowest_score:.3f})[/dim]"
+                    )
+
     # Pattern analysis summary
     pattern_analysis = results.get("pattern_analysis", {})
     if pattern_analysis:
