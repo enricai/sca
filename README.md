@@ -65,6 +65,19 @@ pip install semantic-code-analyzer
 
 ### Development Install
 
+**Recommended: Using Conda**
+```bash
+# Create clean environment
+conda create -n sca python=3.9 -y
+conda activate sca
+
+# Clone and install
+git clone https://github.com/sca/semantic-code-analyzer
+cd semantic-code-analyzer
+pip install -e .
+```
+
+**Alternative: Direct pip install**
 ```bash
 git clone https://github.com/sca/semantic-code-analyzer
 cd semantic-code-analyzer
