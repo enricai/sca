@@ -405,7 +405,9 @@ class MultiDimensionalScorer:
                             f"Rebuilding indices: previous commit was {domain_analyzer._indices_commit}, "
                             f"new commit is {resolved_index_commit}"
                         )
-                    report_progress("Building pattern indices for domain-aware analysis...")
+                    report_progress(
+                        "Building pattern indices for domain-aware analysis..."
+                    )
                     logger.info(
                         f"Building pattern indices from commit: {resolved_index_commit}"
                     )
@@ -512,7 +514,9 @@ class MultiDimensionalScorer:
                             (commit.tree / file_path).data_stream.read().decode("utf-8")
                         )
                         commit_files[file_path] = file_content
-                        logger.debug(f"Extracted full content for added file: {file_path}")
+                        logger.debug(
+                            f"Extracted full content for added file: {file_path}"
+                        )
 
                     elif not item.deleted_file:
                         # Modified file - extract only changed lines

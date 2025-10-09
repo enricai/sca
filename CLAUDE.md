@@ -6,7 +6,14 @@ code in this repository.
 ## Build/Lint/Test Commands
 
 - Setup environment: `conda create -n sca python=3.10 -y && conda activate sca`
-- Fix OpenMP conflicts: `conda env config vars set KMP_DUPLICATE_LIB_OK=TRUE && conda deactivate && conda activate sca`
+- Fix OpenMP conflicts:
+
+  ```bash
+  conda env config vars set KMP_DUPLICATE_LIB_OK=TRUE
+  conda deactivate
+  conda activate sca
+  ```
+
 - Install dependencies: `pip install -e .`
 - Install dev dependencies: `pip install -r requirements-dev.txt`
 - Format code: `black .`
@@ -24,9 +31,12 @@ code in this repository.
 - Custom similarity threshold: `sca-analyze analyze HEAD --similarity-threshold 0.4`
 - Custom configuration: `sca-analyze analyze HEAD \
   --similarity-threshold 0.4 --max-similar-patterns 15`
-- Compare against specific commit: `sca-analyze analyze HEAD --pattern-index-commit main`
-- Compare against parent (default): `sca-analyze analyze HEAD --pattern-index-commit parent`
-- Disable AI features: `sca-analyze analyze HEAD --disable-domain-adherence --disable-pattern-indices`
+- Compare against specific commit:
+  `sca-analyze analyze HEAD --pattern-index-commit main`
+- Compare against parent (default):
+  `sca-analyze analyze HEAD --pattern-index-commit parent`
+- Disable AI features:
+  `sca-analyze analyze HEAD --disable-domain-adherence --disable-pattern-indices`
 
 ## MANDATORY Requirements (MUST follow)
 

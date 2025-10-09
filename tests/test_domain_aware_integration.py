@@ -121,7 +121,7 @@ CREATE TABLE users (
             mock_parent.diff.return_value = [mock_diff_item]
 
             mock_commit.parents = [mock_parent]  # Has parent commit
-            mock_commit.hexsha = "abc123def"
+            mock_commit.hexsha = "abc123def"  # pragma: allowlist secret
 
             # Mock commit lookup to return appropriate commits
             def mock_commit_lookup(ref: str) -> Mock:

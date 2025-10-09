@@ -65,7 +65,8 @@ pip install semantic-code-analyzer
 
 ### Development Install
 
-**Recommended: Using Conda**
+#### Recommended: Using Conda
+
 ```bash
 # Create clean environment
 conda create -n sca python=3.10 -y
@@ -82,7 +83,8 @@ cd semantic-code-analyzer
 pip install -e .
 ```
 
-**Alternative: Direct pip install**
+#### Alternative: Direct pip install
+
 ```bash
 git clone https://github.com/sca/semantic-code-analyzer
 cd semantic-code-analyzer
@@ -201,7 +203,9 @@ for feedback in results['actionable_feedback']:
 - **Confidence Scoring**: Measures certainty of pattern matches and domain classification
 
 **Pattern Index Commit Options:**
-- `--pattern-index-commit parent` (default): Compare against the parent commit's codebase
+
+- `--pattern-index-commit parent` (default): Compare against the parent
+  commit's codebase
 - `--pattern-index-commit main`: Compare against the main branch patterns
 - `--pattern-index-commit HEAD`: Compare against current repository state
 
@@ -359,7 +363,9 @@ def quality_gate(commit_hash: str) -> bool:
 ## 🏆 Analysis Modes
 
 ### Embeddings-Only Mode (Default) ⭐
+
 Pure style matching using only GraphCodeBERT semantic embeddings:
+
 - Domain-aware comparison (frontend vs frontend, backend vs backend)
 - Learns YOUR coding style from parent commit
 - Framework-agnostic (works with any language)
@@ -368,23 +374,35 @@ Pure style matching using only GraphCodeBERT semantic embeddings:
 - Analyzes only changed lines (not entire files)
 
 ### Multi-Dimensional Mode (`--enable-regex-analyzers`)
+
 Combines semantic embeddings with regex-based pattern analyzers:
-- 5 specialized analyzers (architectural, quality, TypeScript, framework, domain adherence)
+
+- 5 specialized analyzers (architectural, quality, TypeScript, framework,
+  domain adherence)
 - Checks against hardcoded best practices
 - Framework-specific (Next.js/React/TypeScript)
 - Useful for best-practice compliance checking
 
 ## 🏆 Benefits Over Traditional Analysis
 
-| Traditional Semantic Similarity | Embeddings-Only Mode | Multi-Dimensional Mode |
-|--------------------------------|---------------------|------------------------|
-| Single embedding-based score | Domain-aware embeddings | 5 specialized analyzers |
-| 5% differentiation | 15-25% differentiation | 20-40% differentiation |
-| No actionable feedback | Similarity-based feedback | Specific rule-based recommendations |
-| Framework-agnostic | Framework-agnostic ✅ | Next.js/React/TS specific |
-| ML overhead (15-30s init) | ML overhead (15-30s init) | Fast regex + optional AI |
-| Dominated by boilerplate | Changed lines only ✅ | Focuses on quality patterns |
-| Generic pattern matching | Domain-aware ✅ | Domain-aware + hardcoded rules |
+| Traditional Semantic Similarity | Embeddings-Only Mode |
+  Multi-Dimensional Mode |
+|--------------------------------|---------------------|
+  ------------------------|
+| Single embedding-based score | Domain-aware embeddings |
+  5 specialized analyzers |
+| 5% differentiation | 15-25% differentiation |
+  20-40% differentiation |
+| No actionable feedback | Similarity-based feedback |
+  Specific rule-based recommendations |
+| Framework-agnostic | Framework-agnostic ✅ |
+  Next.js/React/TS specific |
+| ML overhead (15-30s init) | ML overhead (15-30s init) |
+  Fast regex + optional AI |
+| Dominated by boilerplate | Changed lines only ✅ |
+  Focuses on quality patterns |
+| Generic pattern matching | Domain-aware ✅ |
+  Domain-aware + hardcoded rules |
 
 ## 📚 Examples
 

@@ -420,7 +420,7 @@ class DomainAwareAdherenceAnalyzer(BaseAnalyzer):
             max_similarity = max(similarity_scores)
 
             # Debug logging
-            logger.debug(f"=== PATTERN SIMILARITY ===")
+            logger.debug("=== PATTERN SIMILARITY ===")
             logger.debug(f"Found {len(similar_patterns)} similar patterns")
             logger.debug(f"Individual scores: {[f'{s:.4f}' for s in similarity_scores[:5]]}")
             logger.debug(f"Mean similarity: {pattern_similarity:.4f}")
@@ -518,12 +518,12 @@ class DomainAwareAdherenceAnalyzer(BaseAnalyzer):
         final_score = max(0.0, min(1.0, overall_score))
 
         # Debug logging
-        logger.debug(f"=== SCORE CALCULATION ===")
-        logger.debug(f"Inputs:")
+        logger.debug("=== SCORE CALCULATION ===")
+        logger.debug("Inputs:")
         logger.debug(f"  domain_quality: {domain_quality:.4f}")
         logger.debug(f"  pattern_similarity: {pattern_similarity:.4f}")
         logger.debug(f"  pattern_count: {pattern_count}")
-        logger.debug(f"Components:")
+        logger.debug("Components:")
         logger.debug(f"  base_score: {base_score:.4f}")
         logger.debug(f"  coverage_score: {coverage_score:.4f}")
         logger.debug(f"  weighted_components: {weighted_components:.4f}")
