@@ -180,6 +180,7 @@ class DomainAwareAdherenceAnalyzer(BaseAnalyzer):
         # Track if indices have been built and from which commit
         self._indices_built: set[str] = set()
         self._indices_commit: str | None = None
+        self._warned_domains: set[str] = set()  # Track domains we've warned about
 
         report_progress("Domain adherence analyzer ready!")
 
@@ -278,10 +279,12 @@ class DomainAwareAdherenceAnalyzer(BaseAnalyzer):
         if (
             domain_str not in self._indices_built
             and domain != ArchitecturalDomain.UNKNOWN
+            and domain_str not in self._warned_domains
         ):
             logger.warning(
                 f"No pattern index found for domain {domain_str}. Adherence analysis limited."
             )
+            self._warned_domains.add(domain_str)
 
         # Search for similar patterns
         similar_patterns = []
