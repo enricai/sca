@@ -643,13 +643,25 @@ def compare(
 
 def _display_results(results: dict[str, Any], verbose: bool = False) -> None:
     """Display analysis results in a formatted way."""
-    # Overall score panel
+    # Overall score panel with code-focused score
     overall_score = results.get("overall_adherence", 0)
-    score_color = _get_score_color(overall_score)
+    code_focused_score = results.get("code_focused_score", overall_score)
+    score_color = _get_score_color(code_focused_score)
+
+    # Show both scores if they're different
+    if abs(overall_score - code_focused_score) > 0.01:
+        score_text = (
+            f"[{score_color}]Code-Focused Score: {code_focused_score:.3f}[/{score_color}] "
+            f"[dim](Overall: {overall_score:.3f})[/dim]"
+        )
+    else:
+        score_text = (
+            f"[{score_color}]Overall Adherence: {overall_score:.3f}[/{score_color}]"
+        )
 
     console.print(
         Panel(
-            f"[{score_color}]Overall Adherence: {overall_score:.3f}[/{score_color}]",
+            score_text,
             title="Analysis Results",
             border_style=score_color,
         )
@@ -674,6 +686,61 @@ def _display_results(results: dict[str, Any], verbose: bool = False) -> None:
 
         console.print(table)
 
+    # Domain breakdown table
+    domain_breakdown = results.get("domain_breakdown", {})
+    if domain_breakdown:
+        # Import DOMAIN_WEIGHTS for display
+        from .scorers.multi_dimensional_scorer import DOMAIN_WEIGHTS
+
+        domain_table = Table(title="Domain Breakdown")
+        domain_table.add_column("Domain", style="cyan")
+        domain_table.add_column("Files", justify="right")
+        domain_table.add_column("Avg Score", justify="right")
+        domain_table.add_column("Range", justify="right", style="dim")
+        domain_table.add_column("Weight", justify="center", style="dim")
+        domain_table.add_column("Interpretation")
+
+        # Sort domains: code domains first (backend, frontend, testing, database)
+        # then infrastructure, then docs/config
+        code_domains = ["backend", "frontend", "testing", "database"]
+        other_domains = [d for d in domain_breakdown.keys() if d not in code_domains]
+
+        for domain in code_domains + other_domains:
+            if domain in domain_breakdown:
+                stats = domain_breakdown[domain]
+                avg_score = stats["avg_score"]
+                min_score = stats["min_score"]
+                max_score = stats["max_score"]
+                file_count = stats["file_count"]
+                weight = DOMAIN_WEIGHTS.get(domain, 0.5)
+
+                # Color-coded weight indicator
+                if weight >= 0.8:
+                    weight_icon = "🟢"
+                elif weight >= 0.5:
+                    weight_icon = "🟡"
+                else:
+                    weight_icon = "🔴"
+
+                score_color = _get_score_color(avg_score)
+                interpretation = _get_score_interpretation(avg_score)
+
+                # Add note for low-weight domains
+                if weight < 0.5:
+                    interpretation = f"{interpretation} (low weight)"
+
+                domain_table.add_row(
+                    domain.title(),
+                    str(file_count),
+                    f"[{score_color}]{avg_score:.3f}[/{score_color}]",
+                    f"{min_score:.2f}-{max_score:.2f}",
+                    weight_icon,
+                    interpretation,
+                )
+
+        console.print("\n")
+        console.print(domain_table)
+
     # Pattern analysis summary
     pattern_analysis = results.get("pattern_analysis", {})
     if pattern_analysis:
@@ -691,9 +758,55 @@ def _display_results(results: dict[str, Any], verbose: bool = False) -> None:
             for pattern_type, count in patterns_by_type.items():
                 console.print(f"    {pattern_type}: {count}")
 
-    # Actionable feedback
+    # Actionable feedback - grouped by domain for code review focus
     feedback = results.get("actionable_feedback", [])
-    if feedback:
+    domain_breakdown = results.get("domain_breakdown", {})
+
+    if feedback and domain_breakdown:
+        # Helper function to extract domain from file path using domain_breakdown
+        def get_file_domain(file_path: str) -> str:
+            """Get domain for a file from domain breakdown."""
+            for domain, stats in domain_breakdown.items():
+                if file_path in stats.get("files", []):
+                    return domain
+            return "unknown"
+
+        # Show top issues per code domain (skip docs/config)
+        code_domains = ["backend", "frontend", "testing", "database"]
+        console.print("\n[bold]Top Issues by Domain:[/bold]")
+
+        shown_count = 0
+        for domain in code_domains:
+            # Get recommendations for this domain
+            domain_recs = [
+                rec
+                for rec in feedback
+                if get_file_domain(rec["file"]) == domain
+                and rec["severity"]
+                in ["error", "warning"]  # Focus on actionable issues
+            ]
+
+            if domain_recs and shown_count < 3:  # Show up to 3 domains
+                console.print(f"\n  [{domain.title()}]")
+                for rec in domain_recs[:2]:  # Top 2 per domain
+                    severity_color = _get_severity_color(rec["severity"])
+                    console.print(
+                        f"    • [{severity_color}]{rec['file']}[/{severity_color}]: {rec['message'][:80]}..."
+                    )
+                shown_count += 1
+
+        # If no code domain issues, show generic top recommendations
+        if shown_count == 0:
+            console.print("\n[bold]Top Recommendations:[/bold]")
+            for i, rec in enumerate(feedback[:5], 1):  # Show top 5
+                severity_color = _get_severity_color(rec["severity"])
+                console.print(
+                    f"  {i}. [{severity_color}]{rec['severity'].upper()}[/{severity_color}]: {rec['message']}"
+                )
+                if rec.get("suggested_fix"):
+                    console.print(f"     [dim]Fix: {rec['suggested_fix']}[/dim]")
+    elif feedback:
+        # Fallback to original display if no domain breakdown
         console.print("\n[bold red]Top Recommendations:[/bold red]")
         for i, rec in enumerate(feedback[:5], 1):  # Show top 5
             severity_color = _get_severity_color(rec["severity"])

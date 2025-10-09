@@ -56,6 +56,19 @@ from .weighted_aggregator import AggregatedResult, WeightedAggregator
 
 logger = logging.getLogger(__name__)
 
+# Domain importance weights for code review relevance
+# Higher weight = more important for evaluating code quality in a review context
+DOMAIN_WEIGHTS = {
+    "backend": 1.0,  # Critical - server-side logic and API implementation
+    "frontend": 1.0,  # Critical - UI components and client-side logic
+    "testing": 0.9,  # Important - quality assurance and test coverage
+    "database": 0.8,  # Important - data layer and migrations
+    "infrastructure": 0.7,  # Medium - deployment and DevOps configurations
+    "unknown": 0.5,  # Medium - unclear classification
+    "configuration": 0.3,  # Low - usually simple key-value pairs
+    "documentation": 0.2,  # Low - markdown content (easy to match patterns)
+}
+
 
 @dataclass
 class EnhancedScorerConfig:
@@ -745,7 +758,52 @@ class MultiDimensionalScorer:
                     )
 
         # Aggregate using the weighted aggregator
-        return self.aggregator.aggregate(dimensional_scores, weights)
+        aggregated = self.aggregator.aggregate(dimensional_scores, weights)
+
+        # Calculate domain-weighted score for code-focused evaluation
+        # This gives higher weight to implementation domains (backend/frontend/testing)
+        # and lower weight to documentation/configuration
+
+        # First, check if we have any known-domain files
+        has_known_domains = False
+        for _analyzer_name, results in dimensional_results.items():
+            for _file_path, result in results.items():
+                if result.metrics.get("domain", "unknown") != "unknown":
+                    has_known_domains = True
+                    break
+            if has_known_domains:
+                break
+
+        # Calculate weighted scores
+        domain_weighted_scores = []
+        domain_weights_used = []
+
+        for _analyzer_name, results in dimensional_results.items():
+            for _file_path, result in results.items():
+                file_domain = result.metrics.get("domain", "unknown")
+                domain_weight = DOMAIN_WEIGHTS.get(file_domain, 0.5)
+
+                # Skip unknown domain files if there are known-domain files
+                if file_domain == "unknown" and has_known_domains:
+                    continue
+
+                domain_weighted_scores.append(result.score * domain_weight)
+                domain_weights_used.append(domain_weight)
+
+        # Calculate weighted average
+        if domain_weights_used:
+            code_focused_score = sum(domain_weighted_scores) / sum(domain_weights_used)
+            logger.info(
+                f"Code-focused score (domain-weighted): {code_focused_score:.4f} "
+                f"(vs simple average: {aggregated.overall_score:.4f})"
+            )
+        else:
+            code_focused_score = aggregated.overall_score
+
+        # Add code-focused score to aggregated result (monkey-patch for now)
+        aggregated.code_focused_score = code_focused_score  # type: ignore[attr-defined]
+
+        return aggregated
 
     def _create_enhanced_output(
         self,
@@ -763,6 +821,11 @@ class MultiDimensionalScorer:
         """
         enhanced_output = {
             "overall_adherence": aggregated_results.overall_score,
+            "code_focused_score": getattr(
+                aggregated_results,
+                "code_focused_score",
+                aggregated_results.overall_score,
+            ),
             "dimensional_scores": aggregated_results.dimensional_scores,
             "confidence": aggregated_results.confidence,
         }
@@ -826,6 +889,10 @@ class MultiDimensionalScorer:
             "pattern_confidence_avg": self._calculate_average_confidence(all_patterns),
         }
 
+        # Add domain-stratified statistics
+        domain_breakdown = self._calculate_domain_statistics(dimensional_results)
+        enhanced_output["domain_breakdown"] = domain_breakdown
+
         # Add actionable feedback
         if self.config.include_actionable_feedback:
             enhanced_output["actionable_feedback"] = self._generate_actionable_feedback(
@@ -868,6 +935,48 @@ class MultiDimensionalScorer:
         if not patterns:
             return 0.0
         return sum(pattern.confidence for pattern in patterns) / len(patterns)
+
+    def _calculate_domain_statistics(
+        self, dimensional_results: dict[str, dict[str, AnalysisResult]]
+    ) -> dict[str, Any]:
+        """Calculate statistics grouped by architectural domain.
+
+        Args:
+            dimensional_results: Results from multi-dimensional analysis
+
+        Returns:
+            Dictionary mapping domain names to their statistics
+        """
+        domain_stats: dict[str, dict[str, Any]] = {}
+
+        # Collect files and scores by domain
+        for _analyzer_name, analyzer_results in dimensional_results.items():
+            for file_path, result in analyzer_results.items():
+                domain = result.metrics.get("domain", "unknown")
+
+                if domain not in domain_stats:
+                    domain_stats[domain] = {
+                        "files": [],
+                        "scores": [],
+                        "file_count": 0,
+                    }
+
+                domain_stats[domain]["files"].append(file_path)
+                domain_stats[domain]["scores"].append(result.score)
+                domain_stats[domain]["file_count"] += 1
+
+        # Calculate average scores and confidence per domain
+        for _domain, stats in domain_stats.items():
+            if stats["scores"]:
+                stats["avg_score"] = sum(stats["scores"]) / len(stats["scores"])
+                stats["min_score"] = min(stats["scores"])
+                stats["max_score"] = max(stats["scores"])
+            else:
+                stats["avg_score"] = 0.0
+                stats["min_score"] = 0.0
+                stats["max_score"] = 0.0
+
+        return domain_stats
 
     def _generate_actionable_feedback(
         self, recommendations: list[Recommendation]
