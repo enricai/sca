@@ -306,7 +306,7 @@ class DomainAwareAdherenceAnalyzer(BaseAnalyzer):
 
         # Generate improvement suggestions
         improvement_suggestions = self._generate_improvement_suggestions(
-            domain_classification, similar_patterns, adherence_score
+            domain_classification, similar_patterns, adherence_score, file_path
         )
 
         # Create base analysis result for compatibility
@@ -688,6 +688,7 @@ class DomainAwareAdherenceAnalyzer(BaseAnalyzer):
         domain_classification: DomainClassificationResult,
         similar_patterns: list[SimilarityMatch],
         adherence_score: AdherenceScore,
+        file_path: str = "",
     ) -> list[str]:
         """Generate specific improvement suggestions based on analysis.
 
@@ -695,6 +696,7 @@ class DomainAwareAdherenceAnalyzer(BaseAnalyzer):
             domain_classification: Domain classification result
             similar_patterns: Similar patterns found
             adherence_score: Calculated adherence scores
+            file_path: Path to the file being analyzed (for extension filtering)
 
         Returns:
             List of improvement suggestions
@@ -731,13 +733,40 @@ class DomainAwareAdherenceAnalyzer(BaseAnalyzer):
                 "meaningful test names, and appropriate assertions"
             )
 
-        # Pattern-based suggestions
+        # Pattern-based suggestions with file type filtering
         if similar_patterns:
-            best_match = max(similar_patterns, key=lambda p: p.similarity_score)
-            suggestions.append(
-                f"Consider patterns from {best_match.file_path} "
-                f"(similarity: {best_match.similarity_score:.2f})"
-            )
+            from pathlib import Path
+
+            # Filter to only relevant file types for meaningful comparisons
+            file_ext = Path(file_path).suffix if file_path else ""
+
+            # Define file type categories for filtering
+            code_extensions = {".ts", ".tsx", ".js", ".jsx", ".py"}
+            sql_extensions = {".sql"}
+
+            # Filter similar patterns to only include compatible file types
+            relevant_patterns = []
+            for pattern in similar_patterns:
+                pattern_ext = Path(pattern.file_path).suffix
+
+                # Same extension is always compatible
+                if pattern_ext == file_ext:
+                    relevant_patterns.append(pattern)
+                # Code-to-code comparisons (any code language to any code language)
+                elif file_ext in code_extensions and pattern_ext in code_extensions:
+                    relevant_patterns.append(pattern)
+                # SQL files only to SQL files
+                elif file_ext in sql_extensions and pattern_ext in sql_extensions:
+                    relevant_patterns.append(pattern)
+                # Don't compare code to docs/config or vice versa
+                # (already filtered by above conditions)
+
+            if relevant_patterns:
+                best_match = max(relevant_patterns, key=lambda p: p.similarity_score)
+                suggestions.append(
+                    f"Consider patterns from {best_match.file_path} "
+                    f"(similarity: {best_match.similarity_score:.2f})"
+                )
 
         # General adherence suggestions
         if adherence_score.domain_match_quality < 0.7:

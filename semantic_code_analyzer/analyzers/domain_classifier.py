@@ -251,6 +251,10 @@ class DomainClassifier(BaseAnalyzer):
                     r"src/pages/.*\.(tsx?|jsx?)$",  # Next.js pages
                     r"src/app/(?!api).*\.(tsx?|jsx?)$",  # Next.js app directory (excluding API)
                     r"components/.*\.(tsx?|jsx?)$",
+                    r"src/contexts/.*\.(tsx?|jsx?)$",  # React contexts
+                    r"src/hooks/.*\.(tsx?|jsx?)$",  # Custom React hooks
+                    r"src/types/.*\.(ts|tsx)$",  # TypeScript types for frontend
+                    r"src/utils/.*\.(tsx?|jsx?)$",  # Frontend utilities
                     r"src/(?!api/|lib/|utils\.)[^/]*\.(tsx?|jsx?)$",  # Direct React/TypeScript files in src root (excluding api/lib subdirs and utils.* files)
                     r".*\.css$",
                     r".*\.scss$",
@@ -292,6 +296,8 @@ class DomainClassifier(BaseAnalyzer):
                     r".*\.test\.(ts|tsx|js|jsx|py)$",  # file.test.tsx
                     r".*\.spec\.(ts|tsx|js|jsx|py)$",  # file.spec.tsx
                     r"(^|.*/)(tests?|__tests__)(/.*)?$",  # tests/, test/, __tests__ dir
+                    r".*jest\.(config|setup)\.(ts|tsx|js|jsx)$",  # jest.config.js, jest.setup.js
+                    r".*vitest\.(config|setup)\.(ts|tsx|js|jsx)$",  # vitest.config.js
                     r".*cypress.*",
                     r".*playwright.*",
                     r".*e2e.*",

@@ -257,7 +257,7 @@ export default Button;
         )
 
         suggestions = analyzer._generate_improvement_suggestions(
-            classification, [], adherence_score
+            classification, [], adherence_score, "src/components/Test.tsx"
         )
 
         assert isinstance(suggestions, list)
@@ -266,7 +266,7 @@ export default Button;
         # Test with similar patterns
         similar_patterns = [SimilarityMatch("file1.ts", 0.9, "code", "frontend", {})]
         suggestions_with_patterns = analyzer._generate_improvement_suggestions(
-            classification, similar_patterns, adherence_score
+            classification, similar_patterns, adherence_score, "src/components/Test.tsx"
         )
 
         assert len(suggestions_with_patterns) > len(
