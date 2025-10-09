@@ -928,9 +928,13 @@ class PatternIndexer:
 
             # Debug logging for raw FAISS similarities
             logger.debug(f"=== FAISS SIMILARITY SEARCH (domain: {domain}) ===")
-            logger.debug(f"Top {min(10, len(scores[0]))} raw similarities: {scores[0][:10].tolist()}")
+            logger.debug(
+                f"Top {min(10, len(scores[0]))} raw similarities: {scores[0][:10].tolist()}"
+            )
             logger.debug(f"Mean of top matches: {float(scores[0][:top_k].mean()):.4f}")
-            logger.debug(f"Max similarity: {float(scores[0][0]) if len(scores[0]) > 0 else 0:.4f}")
+            logger.debug(
+                f"Max similarity: {float(scores[0][0]) if len(scores[0]) > 0 else 0:.4f}"
+            )
 
             # Create similarity matches
             similarity_matches = []

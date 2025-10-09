@@ -422,7 +422,9 @@ class DomainAwareAdherenceAnalyzer(BaseAnalyzer):
             # Debug logging
             logger.debug("=== PATTERN SIMILARITY ===")
             logger.debug(f"Found {len(similar_patterns)} similar patterns")
-            logger.debug(f"Individual scores: {[f'{s:.4f}' for s in similarity_scores[:5]]}")
+            logger.debug(
+                f"Individual scores: {[f'{s:.4f}' for s in similarity_scores[:5]]}"
+            )
             logger.debug(f"Mean similarity: {pattern_similarity:.4f}")
             logger.debug(f"Max similarity: {max_similarity:.4f}")
         else:
@@ -482,10 +484,7 @@ class DomainAwareAdherenceAnalyzer(BaseAnalyzer):
         Returns:
             Overall adherence score (0.0 to 1.0)
         """
-        # Enhanced base score for better starting point
-        base_score = 0.5
-
-        # Adjusted weights for better balance
+        # Direct scoring based on actual similarity (no artificial compression)
         domain_weight = 0.25
         similarity_weight = 0.6  # Higher weight on actual pattern similarity
         coverage_weight = 0.15
@@ -493,15 +492,15 @@ class DomainAwareAdherenceAnalyzer(BaseAnalyzer):
         # Enhanced coverage bonus with better scaling
         coverage_score = min(1.0, pattern_count / 8.0)
 
-        # Calculate weighted components
+        # Calculate weighted components - direct score, no compression
         weighted_components = (
             domain_quality * domain_weight
             + pattern_similarity * similarity_weight
             + coverage_score * coverage_weight
         )
 
-        # Weighted combination with base score
-        overall_score = base_score + (weighted_components * 0.5)
+        # Use weighted components directly (no base score or multiplier)
+        overall_score = weighted_components
 
         # Additional bonuses for high-quality classifications
         bonuses = 0.0
@@ -524,12 +523,10 @@ class DomainAwareAdherenceAnalyzer(BaseAnalyzer):
         logger.debug(f"  pattern_similarity: {pattern_similarity:.4f}")
         logger.debug(f"  pattern_count: {pattern_count}")
         logger.debug("Components:")
-        logger.debug(f"  base_score: {base_score:.4f}")
         logger.debug(f"  coverage_score: {coverage_score:.4f}")
         logger.debug(f"  weighted_components: {weighted_components:.4f}")
-        logger.debug(f"  after *0.5 multiplier: {weighted_components * 0.5:.4f}")
         logger.debug(f"  bonuses: +{bonuses:.4f}")
-        logger.debug(f"  raw_total: {overall_score:.4f}")
+        logger.debug(f"  pre_cap_total: {overall_score:.4f}")
         logger.debug(f"Final score (capped 0-1): {final_score:.4f}")
 
         return final_score
