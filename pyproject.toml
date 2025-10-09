@@ -11,7 +11,7 @@ authors = [
     {name = "SCA Team", email = "sca@example.com"},
 ]
 license = {file = "LICENSE"}
-requires-python = ">=3.9"
+requires-python = ">=3.10"
 keywords = ["code-analysis", "code-quality", "pattern-recognition", "git", "typescript", "react", "nextjs"]
 classifiers = [
     "Development Status :: 4 - Beta",
@@ -19,7 +19,6 @@ classifiers = [
     "License :: OSI Approved :: MIT License",
     "Operating System :: MacOS",
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
@@ -92,7 +91,7 @@ packages = ["semantic_code_analyzer"]
 # Black configuration
 [tool.black]
 line-length = 88
-target-version = ['py39']
+target-version = ['py310']
 include = '\.pyi?$'
 extend-exclude = '''
 /(

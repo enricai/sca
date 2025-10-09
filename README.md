@@ -5,7 +5,7 @@ pattern recognition. Evaluates architectural adherence, code quality,
 TypeScript usage, and framework-specific patterns to provide meaningful
 insights into code implementation quality.
 
-[![Python 3.9+](https://img.shields.io/badge/python-3.9+-blue.svg)](https://www.python.org/downloads/)
+[![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Code Quality](https://img.shields.io/badge/Code%20Quality-Multi--Dimensional-green.svg)](https://github.com/sca/semantic-code-analyzer)
 
@@ -53,9 +53,9 @@ Difference:    0.150 (21% better)
 
 ### Prerequisites
 
-- Python 3.9 or higher
+- Python 3.10 or higher
 - Git repository
-- TypeScript/JavaScript codebase (React/Next.js optimized)
+- Any codebase (framework-agnostic with embeddings-only mode)
 
 ### Install
 
@@ -68,7 +68,12 @@ pip install semantic-code-analyzer
 **Recommended: Using Conda**
 ```bash
 # Create clean environment
-conda create -n sca python=3.9 -y
+conda create -n sca python=3.10 -y
+conda activate sca
+
+# Fix OpenMP library conflicts (required for ML libraries)
+conda env config vars set KMP_DUPLICATE_LIB_OK=TRUE
+conda deactivate
 conda activate sca
 
 # Clone and install

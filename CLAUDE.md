@@ -5,6 +5,8 @@ code in this repository.
 
 ## Build/Lint/Test Commands
 
+- Setup environment: `conda create -n sca python=3.10 -y && conda activate sca`
+- Fix OpenMP conflicts: `conda env config vars set KMP_DUPLICATE_LIB_OK=TRUE && conda deactivate && conda activate sca`
 - Install dependencies: `pip install -e .`
 - Install dev dependencies: `pip install -r requirements-dev.txt`
 - Format code: `black .`
@@ -80,7 +82,7 @@ packages with descriptive directory names.
   double quotes for strings.
 - **Imports:** Organized by groups (standard library, third-party, local)
   with isort configuration
-- **Types:** Python 3.9+ with strict type checking. Use Union sparingly,
+- **Types:** Python 3.10+ with strict type checking. Use Union sparingly,
   prefer Optional for nullable types.
 - **Naming:** Use descriptive variable/function names with snake_case for
   variables/functions, PascalCase for classes
@@ -106,7 +108,7 @@ packages with descriptive directory names.
 - **Path Handling:** Use pathlib.Path for all path operations instead of os.path
 - **String Formatting:** Use f-strings for all string interpolation
 - **Collections:** Use typing.List, typing.Dict, etc. for type hints
-  (Python 3.9+ syntax)
+  (Python 3.10+ syntax with improved union types)
 - **Error Handling:** Create custom exception classes inheriting from built-in exceptions
 - **Configuration:** Use dataclasses or Pydantic models for configuration
   management
