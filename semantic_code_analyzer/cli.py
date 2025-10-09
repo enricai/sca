@@ -278,7 +278,9 @@ def analyze(
     # Default to embeddings-only mode (disable regex analyzers)
     if not enable_regex_analyzers:
         logger.info("=== EMBEDDINGS-ONLY MODE (DEFAULT) ===")
-        console.print("[dim]📊 Using semantic embeddings for analysis (add --enable-regex-analyzers for multi-dimensional mode)[/dim]")
+        console.print(
+            "[dim]📊 Using semantic embeddings for analysis (add --enable-regex-analyzers for multi-dimensional mode)[/dim]"
+        )
 
         # Disable all regex analyzers
         disable_architectural = True

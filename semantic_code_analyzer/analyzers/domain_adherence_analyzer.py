@@ -418,9 +418,17 @@ class DomainAwareAdherenceAnalyzer(BaseAnalyzer):
             similarity_scores = [match.similarity_score for match in similar_patterns]
             pattern_similarity = statistics.mean(similarity_scores)
             max_similarity = max(similarity_scores)
+
+            # Debug logging
+            logger.debug(f"=== PATTERN SIMILARITY ===")
+            logger.debug(f"Found {len(similar_patterns)} similar patterns")
+            logger.debug(f"Individual scores: {[f'{s:.4f}' for s in similarity_scores[:5]]}")
+            logger.debug(f"Mean similarity: {pattern_similarity:.4f}")
+            logger.debug(f"Max similarity: {max_similarity:.4f}")
         else:
             pattern_similarity = 0.0
             max_similarity = 0.0
+            logger.debug("No similar patterns found")
 
         # Enhanced domain adherence calculation
         if domain_classification.domain == ArchitecturalDomain.UNKNOWN:
@@ -485,26 +493,46 @@ class DomainAwareAdherenceAnalyzer(BaseAnalyzer):
         # Enhanced coverage bonus with better scaling
         coverage_score = min(1.0, pattern_count / 8.0)
 
-        # Weighted combination with base score
-        overall_score = (
-            base_score
-            + (
-                domain_quality * domain_weight
-                + pattern_similarity * similarity_weight
-                + coverage_score * coverage_weight
-            )
-            * 0.5
+        # Calculate weighted components
+        weighted_components = (
+            domain_quality * domain_weight
+            + pattern_similarity * similarity_weight
+            + coverage_score * coverage_weight
         )
 
+        # Weighted combination with base score
+        overall_score = base_score + (weighted_components * 0.5)
+
         # Additional bonuses for high-quality classifications
+        bonuses = 0.0
         if domain_quality > 0.8:
             overall_score += 0.05
+            bonuses += 0.05
         if pattern_similarity > 0.7:
             overall_score += 0.05
+            bonuses += 0.05
         if pattern_count >= 5:
             overall_score += 0.03
+            bonuses += 0.03
 
-        return max(0.0, min(1.0, overall_score))
+        final_score = max(0.0, min(1.0, overall_score))
+
+        # Debug logging
+        logger.debug(f"=== SCORE CALCULATION ===")
+        logger.debug(f"Inputs:")
+        logger.debug(f"  domain_quality: {domain_quality:.4f}")
+        logger.debug(f"  pattern_similarity: {pattern_similarity:.4f}")
+        logger.debug(f"  pattern_count: {pattern_count}")
+        logger.debug(f"Components:")
+        logger.debug(f"  base_score: {base_score:.4f}")
+        logger.debug(f"  coverage_score: {coverage_score:.4f}")
+        logger.debug(f"  weighted_components: {weighted_components:.4f}")
+        logger.debug(f"  after *0.5 multiplier: {weighted_components * 0.5:.4f}")
+        logger.debug(f"  bonuses: +{bonuses:.4f}")
+        logger.debug(f"  raw_total: {overall_score:.4f}")
+        logger.debug(f"Final score (capped 0-1): {final_score:.4f}")
+
+        return final_score
 
     def _create_adherence_patterns(
         self, analysis: AdherenceAnalysisResult, file_path: str
