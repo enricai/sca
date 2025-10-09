@@ -476,7 +476,11 @@ class MultiDimensionalScorer:
         return enhanced_results
 
     def _extract_commit_files(self, commit_hash: str) -> dict[str, str]:
-        """Extract files changed in a commit using GitPython."""
+        """Extract files changed in a commit using GitPython.
+
+        For added files: extracts entire file content.
+        For modified files: extracts only the changed lines.
+        """
         try:
             commit = self.repo.commit(commit_hash)
 
@@ -484,31 +488,44 @@ class MultiDimensionalScorer:
             if commit.parents:
                 parent = commit.parents[0]
                 # Get diff between commit and parent
-                diff = parent.diff(commit)
+                diff = parent.diff(commit, create_patch=True)
             else:
                 # First commit - compare against empty tree
-                diff = commit.diff(git.NULL_TREE)
+                diff = commit.diff(git.NULL_TREE, create_patch=True)
 
             commit_files = {}
 
             for item in diff:
-                # Only process added or modified files
-                if item.change_type in ["A", "M"] and item.b_path is not None:
-                    file_path = item.b_path
+                if item.b_path is None:
+                    continue
 
-                    # Skip files based on exclude patterns
-                    if self._should_exclude_file(file_path):
-                        continue
+                file_path = item.b_path
 
-                    try:
-                        # Get file content from the commit
+                # Skip files based on exclude patterns
+                if self._should_exclude_file(file_path):
+                    continue
+
+                try:
+                    if item.new_file:
+                        # Added file - analyze entire content
                         file_content = (
                             (commit.tree / file_path).data_stream.read().decode("utf-8")
                         )
                         commit_files[file_path] = file_content
-                    except (UnicodeDecodeError, Exception) as e:
-                        logger.warning(f"Skipping file {file_path}: {e}")
-                        continue
+                        logger.debug(f"Extracted full content for added file: {file_path}")
+
+                    elif not item.deleted_file:
+                        # Modified file - extract only changed lines
+                        changed_content = self._extract_changed_lines(item)
+                        if changed_content.strip():
+                            commit_files[file_path] = changed_content
+                            logger.debug(
+                                f"Extracted {len(changed_content.splitlines())} changed lines from: {file_path}"
+                            )
+
+                except (UnicodeDecodeError, Exception) as e:
+                    logger.warning(f"Skipping file {file_path}: {e}")
+                    continue
 
             logger.info(
                 f"Extracted {len(commit_files)} files from commit {commit_hash}"
@@ -518,6 +535,35 @@ class MultiDimensionalScorer:
         except Exception as e:
             logger.error(f"Failed to extract commit files for {commit_hash}: {e}")
             raise ValueError(f"Invalid commit hash {commit_hash}: {e}") from e
+
+    def _extract_changed_lines(self, diff_item: Any) -> str:
+        """Extract only added/modified lines from a git diff item.
+
+        Args:
+            diff_item: GitPython diff item with patch information
+
+        Returns:
+            String containing only the added/modified lines
+        """
+        try:
+            # Get the unified diff patch
+            if diff_item.diff is None:
+                return ""
+
+            diff_text = diff_item.diff.decode("utf-8")
+            added_lines = []
+
+            for line in diff_text.split("\n"):
+                # Lines starting with '+' are additions (but skip '+++ b/filename' header)
+                if line.startswith("+") and not line.startswith("+++"):
+                    # Remove the '+' prefix and add the actual line
+                    added_lines.append(line[1:])
+
+            return "\n".join(added_lines)
+
+        except Exception as e:
+            logger.warning(f"Failed to extract changed lines: {e}")
+            return ""
 
     def _resolve_pattern_index_commit(
         self, commit_hash: str, pattern_index_commit: str
