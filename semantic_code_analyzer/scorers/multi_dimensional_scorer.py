@@ -705,28 +705,28 @@ class MultiDimensionalScorer:
         dimensional_scores = {}
         for analyzer_name, results in dimensional_results.items():
             if results:  # Only include if we have results
-                # Filter out files with unknown domain
+                # Filter out files with unknown domain (but only if there are also known-domain files)
                 valid_results = {}
                 excluded_files = []
 
                 for file_path, result in results.items():
                     file_domain = result.metrics.get("domain", "unknown")
                     if file_domain == "unknown":
-                        excluded_files.append(file_path)
+                        excluded_files.append((file_path, result))
                         logger.debug(
-                            f"Excluding unknown domain file from averaging: {file_path} (score: {result.score:.2f})"
+                            f"Potential exclusion - unknown domain file: {file_path} (score: {result.score:.2f})"
                         )
                     else:
                         valid_results[file_path] = result
 
-                # Log excluded files for visibility
-                if excluded_files:
-                    logger.info(
-                        f"{analyzer_name}: Excluded {len(excluded_files)} unknown domain files from score: {excluded_files}"
-                    )
-
-                # Calculate average only from valid files
+                # Only exclude unknown files if there are ALSO known-domain files
+                # If ALL files are unknown, include them (better than no data)
                 if valid_results:
+                    # We have some known-domain files, exclude the unknown ones
+                    if excluded_files:
+                        logger.info(
+                            f"{analyzer_name}: Excluded {len(excluded_files)} unknown domain files from score: {[f[0] for f in excluded_files]}"
+                        )
                     file_scores = [result.score for result in valid_results.values()]
                     dimensional_scores[analyzer_name] = (
                         sum(file_scores) / len(file_scores) if file_scores else 0.0
@@ -735,8 +735,13 @@ class MultiDimensionalScorer:
                         f"{analyzer_name}: Averaged {len(valid_results)} files (excluded {len(excluded_files)}), score: {dimensional_scores[analyzer_name]:.4f}"
                     )
                 else:
+                    # All files are unknown domain - include them rather than having no data
                     logger.warning(
-                        f"{analyzer_name}: All files were unknown domain, skipping"
+                        f"{analyzer_name}: All files are unknown domain, including them in average"
+                    )
+                    file_scores = [result.score for _, result in results.items()]
+                    dimensional_scores[analyzer_name] = (
+                        sum(file_scores) / len(file_scores) if file_scores else 0.0
                     )
 
         # Aggregate using the weighted aggregator
@@ -767,6 +772,23 @@ class MultiDimensionalScorer:
         all_recommendations: list[Recommendation] = []
         file_level_results: dict[str, dict[str, Any]] = {}
 
+        # First pass: collect all results and identify unknown domain files
+        unknown_domain_files = set()
+        known_domain_files = set()
+
+        for _analyzer_name, analyzer_results in dimensional_results.items():
+            for file_path, result in analyzer_results.items():
+                file_domain = result.metrics.get("domain", "unknown")
+                if file_domain == "unknown":
+                    unknown_domain_files.add(file_path)
+                else:
+                    known_domain_files.add(file_path)
+
+        # Decide whether to exclude unknown files
+        # Only exclude if there are ALSO known-domain files (mixed case)
+        exclude_unknown = len(known_domain_files) > 0
+
+        # Second pass: collect patterns and recommendations
         for analyzer_name, analyzer_results in dimensional_results.items():
             for file_path, result in analyzer_results.items():
                 # Initialize file entry if not exists
@@ -780,9 +802,15 @@ class MultiDimensionalScorer:
                 # Add analyzer score for this file
                 file_level_results[file_path]["scores"][analyzer_name] = result.score
 
-                # Collect patterns and recommendations
-                all_patterns.extend(result.patterns_found)
-                all_recommendations.extend(result.recommendations)
+                # Include patterns and recommendations based on exclusion decision
+                file_domain = result.metrics.get("domain", "unknown")
+                if file_domain != "unknown" or not exclude_unknown:
+                    all_patterns.extend(result.patterns_found)
+                    all_recommendations.extend(result.recommendations)
+                elif exclude_unknown:
+                    logger.debug(
+                        f"Skipping recommendations from unknown domain file: {file_path}"
+                    )
 
                 file_level_results[file_path]["patterns_count"] += len(
                     result.patterns_found

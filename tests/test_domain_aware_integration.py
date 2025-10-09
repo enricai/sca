@@ -395,9 +395,12 @@ export default NewButton;
             # Mock analysis results with proper AnalysisResult mock
             from semantic_code_analyzer.analyzers.base_analyzer import AnalysisResult
 
-            def create_mock_result(score: float) -> AnalysisResult:
+            def create_mock_result(
+                score: float, domain: str = "frontend"
+            ) -> AnalysisResult:
                 mock_result = Mock(spec=AnalysisResult)
                 mock_result.score = score
+                mock_result.metrics = {"domain": domain}
                 return mock_result
 
             mock_results = {
