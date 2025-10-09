@@ -776,19 +776,34 @@ class QualityAnalyzer(BaseAnalyzer):
                     )
                 )
 
-            # Check for props interface
-            if "interface" not in content and "type.*Props" not in content:
-                recommendations.append(
-                    Recommendation(
-                        severity=Severity.WARNING,
-                        category="react_patterns",
-                        message="Define TypeScript interface or type for component props",
-                        file_path=file_path,
-                        line_number=None,
-                        suggested_fix="interface ComponentNameProps { ... }",
-                        rule_id="MISSING_PROPS_INTERFACE",
+            # Check for props interface - only if component has props
+            # Detect if component has props parameter
+            has_props_param = bool(
+                re.search(r"function\s+\w+\s*\(\s*\{", content)
+                or re.search(r"=\s*\(\s*\{", content)
+            )
+
+            if has_props_param:
+                # Check for different TypeScript typing approaches
+                has_interface = bool(re.search(r"interface\s+\w+Props", content))
+                has_type_alias = bool(re.search(r"type\s+\w+Props\s*=", content))
+                has_inline_types = bool(
+                    re.search(r"\}\s*:\s*\{", content)
+                )  # Inline: }: {
+
+                # Only warn if truly missing types
+                if not (has_interface or has_type_alias or has_inline_types):
+                    recommendations.append(
+                        Recommendation(
+                            severity=Severity.WARNING,
+                            category="react_patterns",
+                            message="Define TypeScript interface or type for component props",
+                            file_path=file_path,
+                            line_number=None,
+                            suggested_fix="interface ComponentNameProps { ... }",
+                            rule_id="MISSING_PROPS_INTERFACE",
+                        )
                     )
-                )
 
             # Check for missing key props in list rendering
             map_without_key = list(
