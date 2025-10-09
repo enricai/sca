@@ -409,39 +409,42 @@ def analyze(
         logger.info("=== MULTIDIMENSIONAL SCORER INITIALIZATION ===")
         logger.info("Starting MultiDimensionalScorer initialization...")
 
-        # Create progress bar for analyzer initialization
+        # Create progress bar for analyzer initialization and analysis
         with Progress(
             SpinnerColumn(),
             TextColumn("[progress.description]{task.description}"),
             TimeElapsedColumn(),
             console=console,
         ) as progress:
-            # Add main initialization task
-            init_task = progress.add_task(
+            # Add main task
+            analysis_task = progress.add_task(
                 "[bold green]Initializing analyzers...", total=None
             )
 
             def progress_callback(message: str) -> None:
                 """Progress callback to update the task description."""
-                progress.update(init_task, description=f"[bold green]{message}")
+                progress.update(analysis_task, description=f"[bold green]{message}")
                 logger.info(f"Progress: {message}")
 
+            # Initialize scorer
             scorer = MultiDimensionalScorer(
                 config, repo_path, device_manager, progress_callback=progress_callback
             )
 
-        logger.info("MultiDimensionalScorer initialized successfully")
+            logger.info("MultiDimensionalScorer initialized successfully")
 
-        # Perform analysis
-        start_time = time.time()
+            # Perform analysis (keep inside Progress context)
+            start_time = time.time()
 
-        results = scorer.analyze_commit(
-            commit_hash,
-            pattern_index_commit=pattern_index_commit,
-            progress_callback=progress_callback,
-        )
+            results = scorer.analyze_commit(
+                commit_hash,
+                pattern_index_commit=pattern_index_commit,
+                progress_callback=progress_callback,
+            )
 
-        analysis_time = time.time() - start_time
+            analysis_time = time.time() - start_time
+
+        # Display completion message after progress bar closes
         console.print(f"[green]Analysis completed in {analysis_time:.2f}s[/green]")
 
         # Display results
