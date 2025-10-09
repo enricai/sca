@@ -6,6 +6,7 @@ code in this repository.
 ## Build/Lint/Test Commands
 
 - Setup environment: `conda create -n sca python=3.10 -y && conda activate sca`
+  (Python 3.10+ required)
 - Fix OpenMP conflicts:
 
   ```bash
@@ -27,6 +28,8 @@ code in this repository.
 - Run single test: `pytest tests/test_file.py::test_function`
 - Build package: `python -m build`
 - CLI command (embeddings-only, default): `sca-analyze analyze HEAD`
+- Verbose output: `sca-analyze analyze HEAD --verbose` or
+  `sca-analyze analyze HEAD -v`
 - Multi-dimensional mode (with regex analyzers): `sca-analyze analyze HEAD --enable-regex-analyzers`
 - Custom similarity threshold: `sca-analyze analyze HEAD --similarity-threshold 0.4`
 - Custom configuration: `sca-analyze analyze HEAD \
@@ -37,6 +40,11 @@ code in this repository.
   `sca-analyze analyze HEAD --pattern-index-commit parent`
 - Disable AI features:
   `sca-analyze analyze HEAD --disable-domain-adherence --disable-pattern-indices`
+- Fine-tune model:
+  `sca-analyze fine-tune HEAD --repo-path . --epochs 3 --batch-size 8`
+- Use fine-tuned model: `sca-analyze analyze HEAD --fine-tuned-model abc123d`
+- Specify hardware device: `sca-analyze analyze HEAD --device mps`
+  (options: auto, cpu, mps, cuda)
 
 ## MANDATORY Requirements (MUST follow)
 

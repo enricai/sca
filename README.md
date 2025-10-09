@@ -53,7 +53,7 @@ Difference:    0.150 (21% better)
 
 ### Prerequisites
 
-- Python 3.10 or higher
+- Python 3.10 or higher (required for ML library compatibility)
 - Git repository
 - Any codebase (framework-agnostic with embeddings-only mode)
 
@@ -123,6 +123,19 @@ sca-analyze compare \
   --compare-commits ai_commit1,ai_commit2,ai_commit3
 ```
 
+### Fine-Tune Model on Your Codebase
+
+```bash
+# Train GraphCodeBERT on your code style patterns
+sca-analyze fine-tune HEAD \
+  --repo-path . \
+  --epochs 3 \
+  --batch-size 8
+
+# Use the fine-tuned model for analysis
+sca-analyze analyze HEAD --fine-tuned-model abc123d
+```
+
 ### Programmatic Usage
 
 ```python
@@ -186,21 +199,28 @@ for feedback in results['actionable_feedback']:
 - Integration patterns (i18n, authentication)
 - Framework conventions
 
-### 🧠 Domain-Aware Adherence Analysis (Default: 10%)
+### 🧠 Domain-Aware Adherence Analysis (Default: 100% in embeddings-only mode)
 
 - **GraphCodeBERT Embeddings**: Semantic code understanding using
   state-of-the-art transformer models
 - **Architectural Domain Classification**: Automatically categorizes code into
-  frontend, backend, testing, or database domains
+  frontend, backend, testing, database, infrastructure, configuration, and
+  documentation domains
+- **Domain-Weighted Scoring**: Higher weights for implementation code
+  (backend: 1.0, frontend: 1.0), lower weights for configuration (0.3) and
+  documentation (0.2)
 - **FAISS Similarity Search**: Fast similarity search within domain-specific
   pattern indices
 - **Pattern Matching**: Finds similar high-quality patterns in your existing
   codebase
+- **Changed Lines Analysis**: Analyzes only modified/added lines for efficiency
 - **Parent Commit Comparison**: By default, compares new code against patterns
   from the commit **before** it was made (ensures fair adherence measurement)
 - **Context-Aware Recommendations**: Suggestions based on actual patterns from
-  your domain-specific code
-- **Confidence Scoring**: Measures certainty of pattern matches and domain classification
+  your domain-specific code, filtered by file type
+- **Unknown Domain Filtering**: Excludes files with unclear domains from scoring
+- **Fine-Tuning Support**: Train custom models on your codebase for better
+  style matching
 
 **Pattern Index Commit Options:**
 
@@ -366,12 +386,16 @@ def quality_gate(commit_hash: str) -> bool:
 
 Pure style matching using only GraphCodeBERT semantic embeddings:
 
-- Domain-aware comparison (frontend vs frontend, backend vs backend)
+- **Domain-aware comparison** (frontend vs frontend, backend vs backend)
+- **Domain-weighted scoring** prioritizes implementation code over config/docs
+- **Code-focused score** separate from overall score for review purposes
 - Learns YOUR coding style from parent commit
 - Framework-agnostic (works with any language)
 - No subjective regex rules
 - 100% based on semantic similarity to YOUR code
 - Analyzes only changed lines (not entire files)
+- **Unknown domain filtering** excludes unclear files from scoring
+- **Fine-tuning support** for custom model training on your codebase
 
 ### Multi-Dimensional Mode (`--enable-regex-analyzers`)
 
@@ -403,6 +427,54 @@ Combines semantic embeddings with regex-based pattern analyzers:
   Focuses on quality patterns |
 | Generic pattern matching | Domain-aware ✅ |
   Domain-aware + hardcoded rules |
+
+## 🎓 Fine-Tuning for Your Codebase
+
+Train a custom GraphCodeBERT model on your codebase to learn your specific
+code style patterns:
+
+### Why Fine-Tune?
+
+- **Better Style Matching**: Model learns YOUR naming conventions, patterns,
+  and idioms
+- **Higher Accuracy**: Improved pattern recognition for domain-specific code
+- **Custom Recommendations**: Suggestions based on YOUR codebase patterns
+
+### Quick Start
+
+```bash
+# 1. Fine-tune on a commit representing your codebase style
+sca-analyze fine-tune HEAD \
+  --repo-path ~/src/myproject \
+  --epochs 3 \
+  --batch-size 8 \
+  --max-files 1000
+
+# 2. Use the fine-tuned model for analysis
+sca-analyze analyze abc123def --fine-tuned-model HEAD
+```
+
+### Fine-Tuning Options
+
+```bash
+sca-analyze fine-tune <commit_hash> [OPTIONS]
+
+Options:
+  --repo-path TEXT          Repository path (default: current directory)
+  --epochs INTEGER          Training epochs (default: 3)
+  --batch-size INTEGER      Batch size (default: 8)
+  --learning-rate FLOAT     Learning rate (default: 5e-5)
+  --max-files INTEGER       Max files for training (default: 1000)
+  --device [auto|cpu|mps|cuda]  Hardware device (default: auto)
+  --output-name TEXT        Custom model name (default: commit hash)
+```
+
+### Performance Notes
+
+- Training takes **30-45 minutes on Apple M3** for typical codebases
+- Requires ~8GB memory minimum (16GB+ recommended)
+- MPS acceleration supported on Apple Silicon
+- CUDA acceleration supported on NVIDIA GPUs
 
 ## 📚 Examples
 

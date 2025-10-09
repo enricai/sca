@@ -42,6 +42,7 @@ from rich.table import Table
 
 from .hardware import DeviceManager, DeviceType
 from .scorers import EnhancedScorerConfig, MultiDimensionalScorer
+from .training import CodeStyleTrainer, FineTuningConfig
 
 console = Console()
 logger = logging.getLogger(__name__)
@@ -239,6 +240,10 @@ def cli(ctx: click.Context, verbose: bool) -> None:
     is_flag=True,
     help="Enable regex-based pattern analyzers (architectural, quality, TypeScript, framework) in addition to semantic embeddings. Default uses only embeddings for pure style matching.",
 )
+@click.option(
+    "--fine-tuned-model",
+    help="Use a fine-tuned GraphCodeBERT model from a specific commit (specify commit hash or model name)",
+)
 @click.pass_context
 def analyze(
     ctx: click.Context,
@@ -261,6 +266,7 @@ def analyze(
     device: str,
     pattern_index_commit: str,
     enable_regex_analyzers: bool,
+    fine_tuned_model: str | None,
 ) -> None:
     """Perform multi-dimensional analysis on a commit."""
     console.print(f"[bold blue]Analyzing commit: {commit_hash}[/bold blue]")
@@ -333,6 +339,11 @@ def analyze(
             f"[yellow]Warning: TypeScript weight very low ({typescript_weight:.3f})[/yellow]"
         )
 
+    # Display fine-tuned model info if being used
+    if fine_tuned_model:
+        console.print(f"[dim]🎯 Using fine-tuned model: {fine_tuned_model}[/dim]")
+        logger.info(f"Fine-tuned model requested: {fine_tuned_model}")
+
     # Create configuration
     logger.info("=== CREATING CONFIGURATION ===")
     logger.info("Creating EnhancedScorerConfig...")
@@ -354,6 +365,7 @@ def analyze(
         max_recommendations_per_file=max_recommendations,
         include_actionable_feedback=True,
         include_pattern_details=ctx.obj["verbose"],
+        fine_tuned_model_commit=fine_tuned_model,
     )
     logger.info("EnhancedScorerConfig created successfully")
 
@@ -982,6 +994,158 @@ def _get_severity_color(severity: str) -> str:
         "info": "blue",
     }
     return severity_colors.get(severity.lower(), "white")
+
+
+@cli.command()
+@click.argument("commit_hash")
+@click.option(
+    "--repo-path",
+    "-r",
+    default=".",
+    help="Path to repository (default: current directory)",
+)
+@click.option(
+    "--epochs",
+    default=3,
+    type=int,
+    help="Number of training epochs (default: 3)",
+)
+@click.option(
+    "--batch-size",
+    default=8,
+    type=int,
+    help="Training batch size (default: 8)",
+)
+@click.option(
+    "--learning-rate",
+    default=5e-5,
+    type=float,
+    help="Learning rate (default: 5e-5)",
+)
+@click.option(
+    "--max-files",
+    default=1000,
+    type=int,
+    help="Maximum files to use for training (default: 1000)",
+)
+@click.option(
+    "--device",
+    type=click.Choice(["auto", "cpu", "mps", "cuda"]),
+    default="auto",
+    help="Hardware device preference (auto, cpu, mps, cuda)",
+)
+@click.option(
+    "--output-name",
+    help="Custom name for fine-tuned model (default: commit hash)",
+)
+@click.pass_context
+def fine_tune(
+    ctx: click.Context,
+    commit_hash: str,
+    repo_path: str,
+    epochs: int,
+    batch_size: int,
+    learning_rate: float,
+    max_files: int,
+    device: str,
+    output_name: str | None,
+) -> None:
+    """Fine-tune GraphCodeBERT on a specific commit to learn code style patterns.
+
+    This command trains a specialized version of GraphCodeBERT on your codebase
+    at the specified commit. The fine-tuned model learns your code style, naming
+    conventions, and patterns, which improves Domain Adherence scores when analyzing
+    similar code.
+
+    Example:
+        sca-analyze fine-tune dbc9a23 --repo-path ~/src/enric/web
+    """
+    console.print(
+        f"[bold blue]Fine-tuning GraphCodeBERT on commit: {commit_hash}[/bold blue]"
+    )
+
+    logger.info("=== STARTING FINE-TUNING ===")
+    logger.info(f"Target commit: {commit_hash}")
+    logger.info(f"Repository path: {repo_path}")
+    logger.info(f"Epochs: {epochs}")
+    logger.info(f"Batch size: {batch_size}")
+    logger.info(f"Learning rate: {learning_rate}")
+    logger.info(f"Max files: {max_files}")
+    logger.info(f"Device preference: {device}")
+
+    try:
+        # Run pre-training health check
+        should_continue, final_device = _run_pre_analysis_health_check(device, console)
+        if not should_continue:
+            console.print("[yellow]Fine-tuning aborted by user[/yellow]")
+            sys.exit(0)
+
+        device = final_device
+
+        # Initialize device manager
+        device_preference = None if device == "auto" else DeviceType(device.lower())
+
+        with console.status("[bold green]Initializing hardware acceleration..."):
+            device_manager = DeviceManager(prefer_device=device_preference)
+
+        # Display hardware info
+        hardware_info = device_manager.hardware_info
+        device_icon = (
+            "⚡"
+            if hardware_info.device_type == DeviceType.MPS
+            else "🖥️" if hardware_info.device_type == DeviceType.CUDA else "💻"
+        )
+        console.print(
+            f"[dim]{device_icon} Using: {hardware_info.device_name} "
+            f"({hardware_info.memory_gb:.1f}GB memory)[/dim]"
+        )
+
+        console.print("[dim]This will take approximately 30-45 minutes on M3...[/dim]")
+
+        # Create training configuration
+        train_config = FineTuningConfig(
+            epochs=epochs,
+            batch_size=batch_size,
+            learning_rate=learning_rate,
+            max_files=max_files,
+            device_preference=device,
+        )
+
+        # Initialize trainer
+        from pathlib import Path
+
+        cache_dir = Path.cwd() / ".sca_cache"
+
+        trainer = CodeStyleTrainer(
+            config=train_config,
+            repo_path=repo_path,
+            cache_dir=cache_dir,
+            device_manager=device_manager,
+        )
+
+        # Start fine-tuning
+        start_time = time.time()
+
+        model_path = trainer.fine_tune_on_commit(commit_hash, output_name)
+
+        training_time = time.time() - start_time
+
+        # Display success message
+        console.print(
+            f"[green]Fine-tuning completed in {training_time / 60:.1f} minutes![/green]"
+        )
+        console.print(f"[green]Model saved to: {model_path}[/green]")
+        console.print("")
+        console.print("[bold]To use this fine-tuned model:[/bold]")
+        console.print(
+            f"  sca-analyze analyze <commit> --fine-tuned-model {commit_hash[:7]}"
+        )
+
+    except Exception as e:
+        console.print(f"[red]Error during fine-tuning: {e}[/red]")
+        if ctx.obj["verbose"]:
+            console.print_exception()
+        sys.exit(1)
 
 
 if __name__ == "__main__":

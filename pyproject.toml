@@ -42,10 +42,11 @@ dependencies = [
     "tqdm>=4.66.0",
     "psutil>=5.9.0",
 
-    # ML dependencies for embeddings
+    # ML dependencies for embeddings and fine-tuning
     "torch>=2.0.0",
     "transformers>=4.30.0",
     "faiss-cpu>=1.7.4",
+    "accelerate>=0.25.0",
 ]
 
 [project.optional-dependencies]

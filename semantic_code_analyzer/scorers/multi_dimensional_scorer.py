@@ -95,6 +95,7 @@ class EnhancedScorerConfig:
     build_pattern_indices: bool = True
     model_name: str = "microsoft/graphcodebert-base"
     cache_dir: str | None = None
+    fine_tuned_model_commit: str | None = None  # Commit hash of fine-tuned model to use
 
     # Output settings
     include_actionable_feedback: bool = True
@@ -267,6 +268,7 @@ class MultiDimensionalScorer:
                 "max_similar_patterns": config.max_similar_patterns,
                 "model_name": config.model_name,
                 "cache_dir": config.cache_dir,
+                "fine_tuned_model_commit": config.fine_tuned_model_commit,
             }
             logger.info(f"Domain config: {domain_config}")
 

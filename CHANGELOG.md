@@ -6,6 +6,87 @@ in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.0] - 2025-01-24
+
+### 🎉 Major New Features
+
+#### Fine-Tuning Support
+
+- **NEW COMMAND**: `sca-analyze fine-tune` for training custom models on your
+  codebase
+- **Custom Model Training**: Learn project-specific code patterns and naming
+  conventions
+- **Training Module**: New `semantic_code_analyzer/training/` module with data
+  preparation and model training
+- **Fine-Tuned Model Usage**: Use `--fine-tuned-model` flag with analyze
+  command
+- **Performance**: 30-45 minute training on Apple M3, supports MPS and CUDA
+  acceleration
+
+#### Domain-Stratified Analysis
+
+- **Domain-Weighted Scoring**: Higher weights for implementation code
+  (backend: 1.0, frontend: 1.0), lower for config (0.3) and docs (0.2)
+- **Code-Focused Score**: Separate score highlighting implementation quality
+  for code reviews
+- **Per-Domain File Details**: Top 5 files shown per domain (backend,
+  frontend, testing, database)
+- **Unknown Domain Filtering**: Excludes unclear classifications from final
+  scoring
+- **7 Domain Classifications**: backend, frontend, testing, database,
+  infrastructure, configuration, documentation
+
+### 🔧 Analysis Improvements
+
+- **Changed Lines Only**: Modified files analyzed only for added/changed lines
+  (not entire file)
+- **File Type Filtering**: Recommendations filtered by file extension for
+  relevance
+- **Pattern Index Commit**: Configurable with `--pattern-index-commit`
+  (default: parent)
+- **Raw Pattern Similarity**: Removed artificial score inflation/compression
+  for honest assessment
+- **CLI Flag Consolidation**: Single `--verbose` flag replaces separate debug
+  flags
+- **Embeddings-Only Default**: Pure semantic analysis by default, use
+  `--enable-regex-analyzers` for multi-dimensional mode
+
+### 🎯 User Experience
+
+- **Pre-Analysis Health Check**: MPS device validation before analysis
+- **Hardware Fallback Reporting**: Detailed warnings when GPU acceleration unavailable
+- **Progress Reporting**: Real-time progress updates during initialization and analysis
+- **Domain Breakdown Table**: Visual domain statistics in analysis output
+
+### 🐛 Bug Fixes
+
+- **Score Honesty**: Removed artificial score manipulation for accurate
+  similarity assessment
+- **Test Classification**: Improved test file detection to prevent false
+  positives
+- **Content Reading**: Pass content through call chain instead of re-reading
+  from disk
+- **Pattern Index Warning**: Warn only once per domain when pattern index
+  missing
+- **Prop Interface Detection**: Better handling of inline types and no-props
+  React components
+- **Python 3.10 Compatibility**: Removed Python 3.10+ strict parameter from zip()
+
+### 💥 Breaking Changes
+
+- **Python Version**: Now requires Python 3.10+ (upgraded from 3.9) for ML
+  library compatibility
+- **Default Mode**: Embeddings-only is now default (use
+  `--enable-regex-analyzers` for multi-dimensional)
+- **Scoring Algorithm**: Raw FAISS similarity scores (no artificial
+  inflation/compression)
+- **Domain Weights**: Global weighting system affects final scores differently
+
+### 📦 Dependencies
+
+- Updated ML dependencies (psutil, torch, transformers, faiss-cpu)
+- OpenMP conflict resolution for ML libraries (KMP_DUPLICATE_LIB_OK)
+
 ## [0.3.0] - 2025-01-22
 
 ### New Features

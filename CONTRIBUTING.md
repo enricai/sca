@@ -12,7 +12,7 @@ contributors. Please be respectful and constructive in all interactions.
 
 ### Prerequisites
 
-- **Python 3.9+** (recommended: Python 3.11 for best performance)
+- **Python 3.10+** (required for ML library compatibility)
 - **Git** for version control
 - **TypeScript/JavaScript codebase** for optimal analysis results
 
@@ -269,21 +269,35 @@ semantic_code_analyzer/
 │   ├── architectural_analyzer.py  # Next.js structure and imports
 │   ├── quality_analyzer.py        # Security, performance, best practices
 │   ├── typescript_analyzer.py     # Type safety and patterns
-│   └── framework_analyzer.py      # Framework-specific features
-└── scorers/                 # Scoring and aggregation
+│   ├── framework_analyzer.py      # Framework-specific features
+│   ├── domain_classifier.py       # Architectural domain classification
+│   └── domain_adherence_analyzer.py  # Semantic pattern matching
+├── embeddings/              # GraphCodeBERT embeddings and pattern indexing
+│   ├── __init__.py
+│   └── pattern_indexer.py   # FAISS pattern indexing and similarity search
+├── hardware/                # Hardware acceleration management
+│   ├── __init__.py
+│   └── device_manager.py    # MPS/CUDA device management
+├── scorers/                 # Scoring and aggregation
+│   ├── __init__.py
+│   ├── multi_dimensional_scorer.py  # Main orchestrator with domain weights
+│   └── weighted_aggregator.py       # Mathematical aggregation
+└── training/                # Fine-tuning support
     ├── __init__.py
-    ├── multi_dimensional_scorer.py  # Main orchestrator
-    └── weighted_aggregator.py       # Mathematical aggregation
+    ├── data_preparation.py  # Training data preparation
+    └── model_trainer.py     # GraphCodeBERT fine-tuning
 ```
 
 ### Key Design Principles
 
-1. **Pattern-Based Analysis** - Rule-based recognition of code quality patterns
-2. **Modular Architecture** - Each analyzer has clear responsibilities
-3. **Framework Awareness** - Specialized knowledge of React/Next.js/TypeScript
-4. **Extensibility** - Easy to add new analyzers and patterns
-5. **Performance** - Lightweight analysis without ML overhead
-6. **Actionable Output** - Specific recommendations for improvement
+1. **Domain-Aware Semantic Analysis** - GraphCodeBERT embeddings with domain classification
+2. **Pattern-Based Analysis** - Rule-based recognition of code quality patterns (optional)
+3. **Modular Architecture** - Each analyzer has clear responsibilities
+4. **Framework Awareness** - Specialized knowledge of React/Next.js/TypeScript
+5. **Extensibility** - Easy to add new analyzers and patterns
+6. **Performance** - Hardware acceleration (MPS/CUDA) with graceful CPU fallback
+7. **Actionable Output** - Specific recommendations for improvement
+8. **Fine-Tuning Support** - Custom model training for project-specific patterns
 
 ### Adding New Features
 

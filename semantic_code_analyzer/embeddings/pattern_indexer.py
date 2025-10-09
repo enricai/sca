@@ -103,6 +103,7 @@ class PatternIndexer:
         device_manager: DeviceManager | None = None,
         enable_optimizations: bool = True,
         progress_callback: Callable[[str], None] | None = None,
+        fine_tuned_model_commit: str | None = None,
     ):
         """Initialize the PatternIndexer with GraphCodeBERT model.
 
@@ -113,6 +114,7 @@ class PatternIndexer:
             device_manager: Device manager for hardware acceleration (auto-created if None)
             enable_optimizations: Enable hardware-specific optimizations
             progress_callback: Optional callback to report initialization progress
+            fine_tuned_model_commit: Commit hash of fine-tuned model to load (optional)
         """
         logger.info("=== PATTERN INDEXER INIT START ===")
         logger.info("Starting PatternIndexer initialization")
@@ -132,7 +134,12 @@ class PatternIndexer:
         self.model_name = model_name
         self.model_revision = model_revision
         self.cache_dir = Path(cache_dir) if cache_dir else Path.cwd() / ".sca_cache"
+        self.fine_tuned_model_commit = fine_tuned_model_commit
+        self.is_fine_tuned = fine_tuned_model_commit is not None
         logger.info(f"Using cache directory: {self.cache_dir}")
+
+        if self.is_fine_tuned:
+            logger.info(f"Fine-tuned model requested: {fine_tuned_model_commit}")
 
         report_progress("Setting up cache directory...")
         try:
@@ -206,50 +213,102 @@ class PatternIndexer:
         logger.info(f"Available memory: {hardware_info.memory_gb:.1f}GB")
 
         try:
-            # Load tokenizer with retry mechanism
-            report_progress("Loading GraphCodeBERT tokenizer...")
-            logger.info("=== TOKENIZER LOADING ===")
-            logger.info("Loading RobertaTokenizer...")
-            logger.info(f"Tokenizer model: {model_name}")
-            logger.info(f"Tokenizer cache dir: {str(self.cache_dir)}")
+            # Check if we should load a fine-tuned model instead
+            if self.is_fine_tuned:
+                report_progress(
+                    f"Loading fine-tuned model for commit {fine_tuned_model_commit}..."
+                )
+                logger.info("=== FINE-TUNED MODEL LOADING ===")
+                fine_tuned_path = self._get_fine_tuned_model_path(
+                    fine_tuned_model_commit
+                )
 
-            self.tokenizer = self._load_with_retry(
-                lambda: RobertaTokenizer.from_pretrained(
-                    model_name,
-                    revision=self.model_revision,
-                    cache_dir=str(self.cache_dir),  # nosec B615
-                ),
-                "tokenizer",
-            )
-            logger.info("Tokenizer loaded successfully!")
+                if not fine_tuned_path.exists():
+                    raise ValueError(
+                        f"Fine-tuned model not found for commit {fine_tuned_model_commit}. "
+                        f"Expected at: {fine_tuned_path}"
+                    )
 
-            # Load model with hardware-specific optimizations and retry mechanism
-            report_progress("Loading GraphCodeBERT model (this is the slow step)...")
-            logger.info("=== MODEL LOADING ===")
-            logger.info("Preparing model loading parameters...")
+                logger.info(f"Loading fine-tuned model from: {fine_tuned_path}")
 
-            # Note: RobertaModel.from_pretrained() doesn't support dtype parameter directly
-            # The dtype should be applied after loading
-            model_kwargs = {
-                "cache_dir": str(self.cache_dir),
-                "low_cpu_mem_usage": self.optimization_settings["low_cpu_mem_usage"],
-                "use_safetensors": True,  # Use safetensors to bypass PyTorch 2.6 requirement
-            }
-            logger.info(f"Model kwargs: {model_kwargs}")
-            logger.info(
-                f"Target dtype (to be applied after loading): {self.optimization_settings['dtype']}"
-            )
+                # Load tokenizer from fine-tuned model directory
+                # Loading from local trusted fine-tuned directory, not remote Hub
+                self.tokenizer = RobertaTokenizer.from_pretrained(
+                    fine_tuned_path
+                )  # nosec B615
+                logger.info("Tokenizer loaded from fine-tuned model")
 
-            logger.info("Loading RobertaModel - THIS IS WHERE SEGFAULTS OFTEN OCCUR!")
-            logger.info("About to call RobertaModel.from_pretrained()...")
+                # Load fine-tuned model
+                # Loading from local trusted fine-tuned directory, not remote Hub
+                self.model = RobertaModel.from_pretrained(
+                    fine_tuned_path,
+                    low_cpu_mem_usage=self.optimization_settings["low_cpu_mem_usage"],
+                )  # nosec B615
+                logger.info("Fine-tuned model loaded successfully")
 
-            self.model = self._load_with_retry(
-                lambda: RobertaModel.from_pretrained(
-                    model_name, revision=self.model_revision, **model_kwargs
-                ),  # nosec B615
-                "model",
-            )
-            logger.info("RobertaModel loaded successfully!")
+                # Load metadata
+                metadata_path = fine_tuned_path / "metadata.json"
+                if metadata_path.exists():
+                    with open(metadata_path, encoding="utf-8") as f:
+                        fine_tuned_metadata = json.load(f)
+                        logger.info(f"Fine-tuned model metadata: {fine_tuned_metadata}")
+                        # fine_tuned_model_commit is guaranteed to be not None here (checked earlier)
+                        if fine_tuned_model_commit:
+                            self.model_name = (
+                                f"fine-tuned-{fine_tuned_model_commit[:7]}"
+                            )
+            else:
+                # Load base GraphCodeBERT model (original behavior)
+                # Load tokenizer with retry mechanism
+                report_progress("Loading GraphCodeBERT tokenizer...")
+                logger.info("=== TOKENIZER LOADING ===")
+                logger.info("Loading RobertaTokenizer...")
+                logger.info(f"Tokenizer model: {model_name}")
+                logger.info(f"Tokenizer cache dir: {str(self.cache_dir)}")
+
+                self.tokenizer = self._load_with_retry(
+                    lambda: RobertaTokenizer.from_pretrained(
+                        model_name,
+                        revision=self.model_revision,
+                        cache_dir=str(self.cache_dir),  # nosec B615
+                    ),
+                    "tokenizer",
+                )
+                logger.info("Tokenizer loaded successfully!")
+
+                # Load model with hardware-specific optimizations and retry mechanism
+                report_progress(
+                    "Loading GraphCodeBERT model (this is the slow step)..."
+                )
+                logger.info("=== MODEL LOADING ===")
+                logger.info("Preparing model loading parameters...")
+
+                # Note: RobertaModel.from_pretrained() doesn't support dtype parameter directly
+                # The dtype should be applied after loading
+                model_kwargs = {
+                    "cache_dir": str(self.cache_dir),
+                    "low_cpu_mem_usage": self.optimization_settings[
+                        "low_cpu_mem_usage"
+                    ],
+                    "use_safetensors": True,  # Use safetensors to bypass PyTorch 2.6 requirement
+                }
+                logger.info(f"Model kwargs: {model_kwargs}")
+                logger.info(
+                    f"Target dtype (to be applied after loading): {self.optimization_settings['dtype']}"
+                )
+
+                logger.info(
+                    "Loading RobertaModel - THIS IS WHERE SEGFAULTS OFTEN OCCUR!"
+                )
+                logger.info("About to call RobertaModel.from_pretrained()...")
+
+                self.model = self._load_with_retry(
+                    lambda: RobertaModel.from_pretrained(
+                        model_name, revision=self.model_revision, **model_kwargs
+                    ),  # nosec B615
+                    "model",
+                )
+                logger.info("RobertaModel loaded successfully!")
 
             report_progress("Configuring model settings...")
             logger.info("Setting model to evaluation mode...")
@@ -945,17 +1004,19 @@ class PatternIndexer:
             )
 
             # Debug logging for raw FAISS similarities
-            logger.debug(f"=== FAISS SIMILARITY SEARCH RESULTS ===")
+            logger.debug("=== FAISS SIMILARITY SEARCH RESULTS ===")
             logger.debug(
                 f"Top {min(10, len(scores[0]))} raw similarities: {[f'{s:.6f}' for s in scores[0][:10]]}"
             )
-            logger.debug(f"Mean of top {top_k} matches: {float(scores[0][:top_k].mean()):.6f}")
+            logger.debug(
+                f"Mean of top {top_k} matches: {float(scores[0][:top_k].mean()):.6f}"
+            )
             logger.debug(
                 f"Max similarity: {float(scores[0][0]) if len(scores[0]) > 0 else 0:.6f}"
             )
 
             # Detailed logging for each match above threshold
-            logger.debug(f"=== DETAILED MATCH ANALYSIS ===")
+            logger.debug("=== DETAILED MATCH ANALYSIS ===")
             for i, (score, idx) in enumerate(
                 zip(scores[0][:search_k], indices[0][:search_k], strict=False)
             ):
@@ -1315,4 +1376,35 @@ class PatternIndexer:
             "cache_directory": str(self.cache_dir),
             "model_device": str(self.device),
             "domains": list(self.domain_indices.keys()),
+        }
+
+    def _get_fine_tuned_model_path(self, commit_hash: str | None = None) -> Path:
+        """Get the path to a fine-tuned model.
+
+        Args:
+            commit_hash: Commit hash of the fine-tuned model (optional, uses self.fine_tuned_model_commit if None)
+
+        Returns:
+            Path to fine-tuned model directory
+        """
+        commit = commit_hash or self.fine_tuned_model_commit
+        if not commit:
+            raise ValueError("No commit hash provided for fine-tuned model")
+
+        # Use first 7 characters of commit hash as model name
+        model_name = commit[:7]
+        return self.cache_dir / "fine_tuned_models" / model_name
+
+    def get_model_info(self) -> dict[str, Any]:
+        """Get information about the currently loaded model.
+
+        Returns:
+            Dictionary with model information
+        """
+        return {
+            "model_name": self.model_name,
+            "is_fine_tuned": self.is_fine_tuned,
+            "fine_tuned_commit": self.fine_tuned_model_commit,
+            "device": str(self.device),
+            "device_type": self.device_manager.hardware_info.device_type.value,
         }

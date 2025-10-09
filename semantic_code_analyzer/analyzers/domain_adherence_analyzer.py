@@ -140,7 +140,15 @@ class DomainAwareAdherenceAnalyzer(BaseAnalyzer):
         # Initialize pattern indexer if dependencies are available
         report_progress("Checking ML model dependencies...")
         if PatternIndexer is not None:
-            report_progress("Loading GraphCodeBERT model (this may take a while)...")
+            fine_tuned_commit = config.get("fine_tuned_model_commit")
+            if fine_tuned_commit:
+                report_progress(
+                    f"Loading fine-tuned GraphCodeBERT model for commit {fine_tuned_commit[:7]}..."
+                )
+            else:
+                report_progress(
+                    "Loading GraphCodeBERT model (this may take a while)..."
+                )
 
             model_name = config.get("model_name", "microsoft/graphcodebert-base")
             cache_dir = config.get("cache_dir")
@@ -155,6 +163,7 @@ class DomainAwareAdherenceAnalyzer(BaseAnalyzer):
                     cache_dir=cache_dir,
                     device_manager=device_manager,
                     progress_callback=pattern_indexer_progress_callback,
+                    fine_tuned_model_commit=fine_tuned_commit,
                 )
             except Exception as e:
                 logger.error(f"PatternIndexer initialization failed: {e}")
