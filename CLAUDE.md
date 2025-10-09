@@ -17,8 +17,9 @@ code in this repository.
 - Run tests in parallel: `pytest -n auto`
 - Run single test: `pytest tests/test_file.py::test_function`
 - Build package: `python -m build`
-- CLI command: `sca-analyze analyze HEAD`
-- With domain adherence: `sca-analyze analyze HEAD --domain-adherence-weight 0.25`
+- CLI command (embeddings-only, default): `sca-analyze analyze HEAD`
+- Multi-dimensional mode (with regex analyzers): `sca-analyze analyze HEAD --enable-regex-analyzers`
+- Custom similarity threshold: `sca-analyze analyze HEAD --similarity-threshold 0.4`
 - Custom configuration: `sca-analyze analyze HEAD \
   --similarity-threshold 0.4 --max-similar-patterns 15`
 - Compare against specific commit: `sca-analyze analyze HEAD --pattern-index-commit main`

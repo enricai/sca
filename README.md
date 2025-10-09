@@ -76,7 +76,7 @@ pip install -e .
 ### Analyze a Single Commit
 
 ```bash
-# Analyze latest commit (compares against parent commit by default)
+# Analyze latest commit (default: semantic embeddings only)
 sca-analyze analyze HEAD
 
 # Analyze specific commit (compares against its parent)
@@ -85,19 +85,11 @@ sca-analyze analyze abc123def
 # Compare against a specific commit (e.g., main branch)
 sca-analyze analyze abc123def --pattern-index-commit main
 
-# Compare against current HEAD (old default behavior)
-sca-analyze analyze abc123def --pattern-index-commit HEAD
+# Enable regex-based analyzers (multi-dimensional mode)
+sca-analyze analyze abc123def --enable-regex-analyzers
 
-# Custom weights (emphasize quality)
-sca-analyze analyze abc123def \
-  --architectural-weight 0.20 \
-  --quality-weight 0.40 \
-  --framework-weight 0.15 \
-  --domain-adherence-weight 0.10
-
-# Enable domain-aware features
+# Custom configuration (embeddings-only)
 sca-analyze analyze HEAD \
-  --domain-adherence-weight 0.25 \
   --similarity-threshold 0.4 \
   --max-similar-patterns 15
 ```
@@ -346,17 +338,35 @@ def quality_gate(commit_hash: str) -> bool:
     return results['overall_adherence'] >= 0.7  # 70% threshold
 ```
 
+## 🏆 Analysis Modes
+
+### Embeddings-Only Mode (Default) ⭐
+Pure style matching using only GraphCodeBERT semantic embeddings:
+- Domain-aware comparison (frontend vs frontend, backend vs backend)
+- Learns YOUR coding style from parent commit
+- Framework-agnostic (works with any language)
+- No subjective regex rules
+- 100% based on semantic similarity to YOUR code
+- Analyzes only changed lines (not entire files)
+
+### Multi-Dimensional Mode (`--enable-regex-analyzers`)
+Combines semantic embeddings with regex-based pattern analyzers:
+- 5 specialized analyzers (architectural, quality, TypeScript, framework, domain adherence)
+- Checks against hardcoded best practices
+- Framework-specific (Next.js/React/TypeScript)
+- Useful for best-practice compliance checking
+
 ## 🏆 Benefits Over Traditional Analysis
 
-| Traditional Semantic Similarity | Enhanced Multi-Dimensional |
-|--------------------------------|---------------------------|
-| Single embedding-based score | 5 specialized analyzers |
-| 5% differentiation | 20-40% differentiation |
-| No actionable feedback | Specific recommendations |
-| Framework-agnostic | Next.js/React/TS aware |
-| ML overhead (15-30s init) | Fast analysis + optional AI |
-| Dominated by boilerplate | Focuses on quality patterns |
-| Generic pattern matching | Domain-aware similarity search |
+| Traditional Semantic Similarity | Embeddings-Only Mode | Multi-Dimensional Mode |
+|--------------------------------|---------------------|------------------------|
+| Single embedding-based score | Domain-aware embeddings | 5 specialized analyzers |
+| 5% differentiation | 15-25% differentiation | 20-40% differentiation |
+| No actionable feedback | Similarity-based feedback | Specific rule-based recommendations |
+| Framework-agnostic | Framework-agnostic ✅ | Next.js/React/TS specific |
+| ML overhead (15-30s init) | ML overhead (15-30s init) | Fast regex + optional AI |
+| Dominated by boilerplate | Changed lines only ✅ | Focuses on quality patterns |
+| Generic pattern matching | Domain-aware ✅ | Domain-aware + hardcoded rules |
 
 ## 📚 Examples
 

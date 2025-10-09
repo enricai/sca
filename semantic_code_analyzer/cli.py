@@ -236,6 +236,11 @@ def cli(ctx: click.Context, verbose: bool, debug: bool) -> None:
     default="parent",
     help="Git commit to use for building pattern indices (default: 'parent' - the commit before the one being analyzed, or specify commit hash like 'HEAD', 'main', etc.)",
 )
+@click.option(
+    "--enable-regex-analyzers",
+    is_flag=True,
+    help="Enable regex-based pattern analyzers (architectural, quality, TypeScript, framework) in addition to semantic embeddings. Default uses only embeddings for pure style matching.",
+)
 @click.pass_context
 def analyze(
     ctx: click.Context,
@@ -257,6 +262,7 @@ def analyze(
     max_recommendations: int,
     device: str,
     pattern_index_commit: str,
+    enable_regex_analyzers: bool,
 ) -> None:
     """Perform multi-dimensional analysis on a commit."""
     console.print(f"[bold blue]Analyzing commit: {commit_hash}[/bold blue]")
@@ -269,19 +275,44 @@ def analyze(
     logger.info(f"Debug mode: {ctx.obj['debug']}")
     logger.info(f"Verbose mode: {ctx.obj['verbose']}")
 
-    # Calculate TypeScript weight as remainder
+    # Default to embeddings-only mode (disable regex analyzers)
+    if not enable_regex_analyzers:
+        logger.info("=== EMBEDDINGS-ONLY MODE (DEFAULT) ===")
+        console.print("[dim]📊 Using semantic embeddings for analysis (add --enable-regex-analyzers for multi-dimensional mode)[/dim]")
+
+        # Disable all regex analyzers
+        disable_architectural = True
+        disable_quality = True
+        disable_typescript = True
+        disable_framework = True
+
+        # Use 100% domain adherence
+        architectural_weight = 0.0
+        quality_weight = 0.0
+        framework_weight = 0.0
+        typescript_weight = 0.0
+        domain_adherence_weight = 1.0
+
+        logger.info("Using embeddings-only mode (default)")
+        logger.info("Domain adherence weight set to 1.0 (100%)")
+    else:
+        logger.info("=== MULTI-DIMENSIONAL MODE (REGEX ANALYZERS ENABLED) ===")
+        console.print("[dim]📊 Using multi-dimensional mode with regex analyzers[/dim]")
+
+    # Calculate TypeScript weight as remainder (if using regex analyzers)
     logger.info("=== WEIGHT CALCULATION ===")
     logger.info(f"Architectural weight: {architectural_weight}")
     logger.info(f"Quality weight: {quality_weight}")
     logger.info(f"Framework weight: {framework_weight}")
     logger.info(f"Domain adherence weight: {domain_adherence_weight}")
 
-    typescript_weight = 1.0 - (
-        architectural_weight
-        + quality_weight
-        + framework_weight
-        + domain_adherence_weight
-    )
+    if enable_regex_analyzers:
+        typescript_weight = 1.0 - (
+            architectural_weight
+            + quality_weight
+            + framework_weight
+            + domain_adherence_weight
+        )
     logger.info(f"Calculated TypeScript weight: {typescript_weight}")
 
     # Validate all weights are positive and sum to 1.0
@@ -298,7 +329,7 @@ def analyze(
         )
         sys.exit(1)
 
-    if typescript_weight < 0.05:
+    if enable_regex_analyzers and typescript_weight < 0.05:
         console.print(
             f"[yellow]Warning: TypeScript weight very low ({typescript_weight:.3f})[/yellow]"
         )

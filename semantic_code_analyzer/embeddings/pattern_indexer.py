@@ -928,7 +928,9 @@ class PatternIndexer:
 
             # Create similarity matches
             similarity_matches = []
-            for score, idx in zip(scores[0], indices[0]):
+            for score, idx in zip(scores[0], indices[0]):  # noqa: B905
+                # Note: strict=False requires Python 3.10+, omitted for 3.9 compatibility
+                # FAISS guarantees scores and indices have same length
                 if idx == -1 or score < min_similarity:
                     continue
 
