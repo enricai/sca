@@ -380,8 +380,9 @@ export default Button;
         # Should handle unknown domain gracefully
         assert result.domain_classification.domain == ArchitecturalDomain.UNKNOWN
         assert isinstance(result.adherence_score, AdherenceScore)
-        # Unknown domain should have neutral adherence score
-        assert 0.2 <= result.adherence_score.domain_adherence <= 0.4
+        # Domain adherence uses same formula as known domains: (confidence * 0.5) + (similarity * 0.5)
+        # With confidence=0.2 and no patterns (similarity=0.0), expect 0.1
+        assert 0.0 <= result.adherence_score.domain_adherence <= 0.2
 
     def test_error_handling(
         self, analyzer: DomainAwareAdherenceAnalyzer, mock_dependencies: Any

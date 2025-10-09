@@ -432,22 +432,9 @@ class DomainAwareAdherenceAnalyzer(BaseAnalyzer):
             max_similarity = 0.0
             logger.debug("No similar patterns found")
 
-        # Enhanced domain adherence calculation
-        if domain_classification.domain == ArchitecturalDomain.UNKNOWN:
-            # Improved handling for unknown domains - less punitive
-            if pattern_similarity > 0.5:
-                domain_adherence = 0.6  # Good patterns even if domain unclear
-            elif pattern_similarity > 0.3:
-                domain_adherence = 0.5  # Moderate patterns
-            else:
-                domain_adherence = 0.4  # Neutral fallback
-        else:
-            # Enhanced weight by domain confidence and pattern similarity
-            domain_adherence = (domain_match_quality * 0.5) + (pattern_similarity * 0.5)
-
-            # Boost score for well-classified domains with good patterns
-            if domain_match_quality > 0.8 and pattern_similarity > 0.6:
-                domain_adherence = min(1.0, domain_adherence * 1.1)
+        # Domain adherence - simple weighted average for informational purposes
+        # (not used for scoring, just for metrics)
+        domain_adherence = (domain_match_quality * 0.5) + (pattern_similarity * 0.5)
 
         # Overall adherence combines multiple factors
         overall_adherence = self._calculate_weighted_adherence(
@@ -474,62 +461,24 @@ class DomainAwareAdherenceAnalyzer(BaseAnalyzer):
     def _calculate_weighted_adherence(
         self, domain_quality: float, pattern_similarity: float, pattern_count: int
     ) -> float:
-        """Calculate improved weighted overall adherence score.
+        """Return pattern similarity as the adherence score.
 
         Args:
-            domain_quality: Quality of domain classification
-            pattern_similarity: Average pattern similarity
-            pattern_count: Number of similar patterns found
+            domain_quality: Quality of domain classification (not used, kept for compatibility)
+            pattern_similarity: Average pattern similarity from FAISS search
+            pattern_count: Number of similar patterns found (not used, kept for compatibility)
 
         Returns:
-            Overall adherence score (0.0 to 1.0)
+            Pattern similarity score (0.0 to 1.0)
         """
-        # Direct scoring based on actual similarity (no artificial compression)
-        domain_weight = 0.25
-        similarity_weight = 0.6  # Higher weight on actual pattern similarity
-        coverage_weight = 0.15
-
-        # Enhanced coverage bonus with better scaling
-        coverage_score = min(1.0, pattern_count / 8.0)
-
-        # Calculate weighted components - direct score, no compression
-        weighted_components = (
-            domain_quality * domain_weight
-            + pattern_similarity * similarity_weight
-            + coverage_score * coverage_weight
-        )
-
-        # Use weighted components directly (no base score or multiplier)
-        overall_score = weighted_components
-
-        # Additional bonuses for high-quality classifications
-        bonuses = 0.0
-        if domain_quality > 0.8:
-            overall_score += 0.05
-            bonuses += 0.05
-        if pattern_similarity > 0.7:
-            overall_score += 0.05
-            bonuses += 0.05
-        if pattern_count >= 5:
-            overall_score += 0.03
-            bonuses += 0.03
-
-        final_score = max(0.0, min(1.0, overall_score))
-
-        # Debug logging
+        # Return raw pattern similarity - no manipulation
+        # Domain weighting happens at the global level in multi_dimensional_scorer.py
         logger.debug("=== SCORE CALCULATION ===")
-        logger.debug("Inputs:")
-        logger.debug(f"  domain_quality: {domain_quality:.4f}")
-        logger.debug(f"  pattern_similarity: {pattern_similarity:.4f}")
-        logger.debug(f"  pattern_count: {pattern_count}")
-        logger.debug("Components:")
-        logger.debug(f"  coverage_score: {coverage_score:.4f}")
-        logger.debug(f"  weighted_components: {weighted_components:.4f}")
-        logger.debug(f"  bonuses: +{bonuses:.4f}")
-        logger.debug(f"  pre_cap_total: {overall_score:.4f}")
-        logger.debug(f"Final score (capped 0-1): {final_score:.4f}")
+        logger.debug(f"  pattern_similarity (raw FAISS): {pattern_similarity:.4f}")
+        logger.debug(f"  domain_quality: {domain_quality:.4f} (informational only)")
+        logger.debug(f"  pattern_count: {pattern_count} (informational only)")
 
-        return final_score
+        return pattern_similarity
 
     def _create_adherence_patterns(
         self, analysis: AdherenceAnalysisResult, file_path: str

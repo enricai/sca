@@ -919,26 +919,102 @@ class PatternIndexer:
         pattern_index = self.domain_indices[domain]
 
         try:
+            # Log domain statistics before search
+            logger.debug(f"=== PATTERN SEARCH INITIALIZATION (domain: {domain}) ===")
+            logger.debug(f"Index contains {pattern_index.index.ntotal} patterns")
+            logger.debug(f"Embedding dimension: {pattern_index.embeddings.shape[1]}")
+            logger.debug(f"Unique files in index: {len(set(pattern_index.file_paths))}")
+
             # Extract query embedding
             query_embedding = self._extract_code_embeddings(query_code)
-            query_embedding = self._normalize_embeddings(query_embedding.reshape(1, -1))
+            query_embedding_normalized = self._normalize_embeddings(
+                query_embedding.reshape(1, -1)
+            )
 
-            # Search in FAISS index
-            scores, indices = pattern_index.index.search(query_embedding, top_k)
+            # Verify query embedding normalization
+            query_norm = float(np.linalg.norm(query_embedding_normalized))
+            logger.debug(f"Query embedding norm: {query_norm:.8f} (should be ~1.0)")
+            logger.debug(
+                f"Query code length: {len(query_code)} chars, first 50: {query_code[:50].replace(chr(10), ' ')}"
+            )
+
+            # Search in FAISS index - get more results for detailed logging
+            search_k = max(top_k, 10)  # Search for at least 10 to see distribution
+            scores, indices = pattern_index.index.search(
+                query_embedding_normalized, search_k
+            )
 
             # Debug logging for raw FAISS similarities
-            logger.debug(f"=== FAISS SIMILARITY SEARCH (domain: {domain}) ===")
+            logger.debug(f"=== FAISS SIMILARITY SEARCH RESULTS ===")
             logger.debug(
-                f"Top {min(10, len(scores[0]))} raw similarities: {scores[0][:10].tolist()}"
+                f"Top {min(10, len(scores[0]))} raw similarities: {[f'{s:.6f}' for s in scores[0][:10]]}"
             )
-            logger.debug(f"Mean of top matches: {float(scores[0][:top_k].mean()):.4f}")
+            logger.debug(f"Mean of top {top_k} matches: {float(scores[0][:top_k].mean()):.6f}")
             logger.debug(
-                f"Max similarity: {float(scores[0][0]) if len(scores[0]) > 0 else 0:.4f}"
+                f"Max similarity: {float(scores[0][0]) if len(scores[0]) > 0 else 0:.6f}"
             )
 
-            # Create similarity matches
+            # Detailed logging for each match above threshold
+            logger.debug(f"=== DETAILED MATCH ANALYSIS ===")
+            for i, (score, idx) in enumerate(
+                zip(scores[0][:search_k], indices[0][:search_k], strict=False)
+            ):
+                if idx == -1:
+                    continue
+
+                matched_file = pattern_index.file_paths[idx]
+                logger.debug(
+                    f"Match {i+1}: score={score:.8f}, file={matched_file}, idx={idx}"
+                )
+
+                # Enhanced logging for perfect/near-perfect matches
+                if score >= 0.999:
+                    logger.warning(
+                        f"!!! PERFECT/NEAR-PERFECT MATCH DETECTED (score: {score:.10f}) !!!"
+                    )
+                    logger.warning(f"  Matched file: {matched_file}")
+
+                    # Manual verification: calculate dot product
+                    query_vec = query_embedding_normalized[0]
+                    matched_vec = pattern_index.embeddings[idx]
+
+                    # Verify matched embedding is normalized
+                    matched_norm = float(np.linalg.norm(matched_vec))
+                    logger.warning(
+                        f"  Matched embedding norm: {matched_norm:.8f} (should be ~1.0)"
+                    )
+
+                    # Calculate dot product manually
+                    manual_dot_product = float(np.dot(query_vec, matched_vec))
+                    logger.warning(
+                        f"  Manual dot product: {manual_dot_product:.10f} (vs FAISS: {score:.10f})"
+                    )
+
+                    # Check if embeddings are identical
+                    embedding_diff = np.abs(query_vec - matched_vec)
+                    max_diff = float(np.max(embedding_diff))
+                    mean_diff = float(np.mean(embedding_diff))
+                    logger.warning(
+                        f"  Embedding difference: max={max_diff:.10f}, mean={mean_diff:.10f}"
+                    )
+
+                    # Log first 10 dimensions for comparison
+                    logger.warning(
+                        f"  Query embedding (first 10): {query_vec[:10].tolist()}"
+                    )
+                    logger.warning(
+                        f"  Matched embedding (first 10): {matched_vec[:10].tolist()}"
+                    )
+
+                    # Log code snippet preview
+                    matched_snippet = pattern_index.code_snippets[idx][:100].replace(
+                        "\n", " "
+                    )
+                    logger.warning(f"  Matched code preview: {matched_snippet}...")
+
+            # Create similarity matches (only for top_k and above threshold)
             similarity_matches = []
-            for score, idx in zip(scores[0], indices[0], strict=False):
+            for score, idx in zip(scores[0][:top_k], indices[0][:top_k], strict=False):
                 if idx == -1 or score < min_similarity:
                     continue
 
@@ -949,7 +1025,7 @@ class PatternIndexer:
                     domain=domain,
                     context={
                         "index": int(idx),
-                        "embedding_dimension": query_embedding.shape[1],
+                        "embedding_dimension": query_embedding_normalized.shape[1],
                         "search_parameters": {
                             "top_k": top_k,
                             "min_similarity": min_similarity,
@@ -959,7 +1035,7 @@ class PatternIndexer:
                 similarity_matches.append(similarity_match)
 
             logger.debug(
-                f"Found {len(similarity_matches)} similar patterns for domain {domain}"
+                f"=== SEARCH COMPLETE: Found {len(similarity_matches)} similar patterns for domain {domain} ==="
             )
             return similarity_matches
 
