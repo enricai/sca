@@ -243,7 +243,7 @@ class DomainAwareAdherenceAnalyzer(BaseAnalyzer):
         score = self._calculate_adherence_score(adherence_analysis)
 
         # Collect comprehensive metrics
-        metrics = {
+        metrics: dict[str, Any] = {
             "domain": adherence_analysis.domain_classification.domain.value,
             "domain_confidence": adherence_analysis.domain_classification.confidence,
             "overall_adherence": adherence_analysis.adherence_score.overall_adherence,
@@ -253,6 +253,58 @@ class DomainAwareAdherenceAnalyzer(BaseAnalyzer):
             "similar_patterns_found": adherence_analysis.adherence_score.similar_patterns_count,
             "domain_match_quality": adherence_analysis.adherence_score.domain_match_quality,
         }
+
+        # Add embedding data for explain feature (saved in JSON when --output is used)
+        if (
+            self.pattern_indexer is not None
+            and adherence_analysis.similar_patterns
+            and len(adherence_analysis.similar_patterns) > 0
+        ):
+            domain_str = adherence_analysis.domain_classification.domain.value
+
+            try:
+                # Get query embedding
+                query_embedding = self.pattern_indexer._extract_code_embeddings(content)
+
+                # Build embedding data structure
+                embedding_data: dict[str, Any] = {
+                    "query_embedding": query_embedding.tolist(),
+                    "query_code": content,
+                    "domain": domain_str,
+                    "similar_patterns": [],
+                }
+
+                # Add top 5 similar patterns with their embeddings and code
+                for pattern in adherence_analysis.similar_patterns[:5]:
+                    pattern_idx = pattern.context.get("index")
+                    if (
+                        pattern_idx is not None
+                        and domain_str in self.pattern_indexer.domain_indices
+                    ):
+                        pattern_embedding = self.pattern_indexer.domain_indices[
+                            domain_str
+                        ].embeddings[pattern_idx]
+
+                        embedding_data["similar_patterns"].append(
+                            {
+                                "file_path": pattern.file_path,
+                                "similarity_score": pattern.similarity_score,
+                                "code_snippet": pattern.code_snippet,
+                                "embedding": pattern_embedding.tolist(),
+                            }
+                        )
+
+                # Add to metrics (flows through to JSON output when --output used)
+                metrics["embedding_data"] = embedding_data
+
+                logger.debug(
+                    f"Saved embedding data for {file_path}: "
+                    f"{len(embedding_data['similar_patterns'])} reference patterns"
+                )
+
+            except Exception as e:
+                logger.warning(f"Failed to save embedding data for {file_path}: {e}")
+                # Don't fail the analysis, just skip embedding data
 
         analysis_time = time.time() - start_time
 

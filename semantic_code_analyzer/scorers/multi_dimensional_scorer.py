@@ -107,10 +107,6 @@ class EnhancedScorerConfig:
     include_test_files: bool = False
     include_generated_files: bool = False
 
-    # Results configuration
-    save_results: bool = True
-    results_dir: str = "analysis_results"
-
     def __post_init__(self) -> None:
         """Validate configuration after initialization."""
         # Validate weights sum to 1.0
@@ -867,6 +863,12 @@ class MultiDimensionalScorer:
                 # Add analyzer score for this file
                 file_level_results[file_path]["scores"][analyzer_name] = result.score
 
+                # Copy embedding_data from metrics if present (for explain command)
+                if "embedding_data" in result.metrics:
+                    file_level_results[file_path]["embedding_data"] = result.metrics[
+                        "embedding_data"
+                    ]
+
                 # Include patterns and recommendations based on exclusion decision
                 file_domain = result.metrics.get("domain", "unknown")
                 if file_domain != "unknown" or not exclude_unknown:
@@ -1054,20 +1056,21 @@ class MultiDimensionalScorer:
 
         Args:
             results: Analysis results to save
-            output_file: Optional output file path
+            output_file: Output file path (required - relative or absolute)
 
         Returns:
-            Path where results were saved
+            Path where results were saved, or empty string if not saved
         """
         if output_file is None:
-            timestamp = int(time.time())
-            output_file = f"analysis_{timestamp}.json"
+            logger.error("save_results called without output_file - not saving")
+            return ""
 
-        # Ensure the results directory exists
-        results_dir = Path(self.config.results_dir)
-        results_dir.mkdir(exist_ok=True)
+        # Use the path exactly as specified by user (relative or absolute)
+        output_path = Path(output_file)
 
-        output_path = results_dir / output_file
+        # Create parent directory if needed
+        if output_path.parent != Path("."):
+            output_path.parent.mkdir(parents=True, exist_ok=True)
 
         with open(output_path, "w", encoding="utf-8") as f:
             json.dump(results, f, indent=2, default=str)

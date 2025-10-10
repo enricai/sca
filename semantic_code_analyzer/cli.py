@@ -1206,5 +1206,406 @@ def fine_tune(
         sys.exit(1)
 
 
+@cli.command()
+@click.argument("file_path")
+@click.option(
+    "--from-results",
+    "-r",
+    required=True,
+    type=click.Path(exists=True),
+    help="Path to analysis results JSON file (from analyze --output)",
+)
+@click.option(
+    "--verbose",
+    "-v",
+    is_flag=True,
+    help="Show detailed technical analysis including embedding dimensions",
+)
+@click.pass_context
+def explain(
+    ctx: click.Context,
+    file_path: str,
+    from_results: str,
+    verbose: bool,
+) -> None:
+    """Explain why a specific file scored low using cached analysis results.
+
+    This command provides detailed insights into embedding divergence,
+    structural differences, and actionable recommendations for improving
+    a file's adherence score.
+
+    Example:
+        sca-analyze analyze HEAD --output results.json
+        sca-analyze explain src/components/UserProfile.tsx -r results.json
+    """
+    console.print(f"[bold blue]Explaining analysis for: {file_path}[/bold blue]")
+
+    logger.info("=== STARTING EXPLAIN COMMAND ===")
+    logger.info(f"File: {file_path}")
+    logger.info(f"Results file: {from_results}")
+    logger.info(f"Verbose: {verbose}")
+
+    try:
+        # Load results JSON
+        with open(from_results, encoding="utf-8") as f:
+            results = json.load(f)
+
+        # Find file in results
+        file_level_analysis = results.get("file_level_analysis", {})
+
+        if file_path not in file_level_analysis:
+            console.print(f"[red]Error: File '{file_path}' not found in results[/red]")
+            console.print("\n[dim]Available files:[/dim]")
+            for available_file in list(file_level_analysis.keys())[:10]:
+                console.print(f"[dim]  - {available_file}[/dim]")
+            if len(file_level_analysis) > 10:
+                console.print(
+                    f"[dim]  ... and {len(file_level_analysis) - 10} more[/dim]"
+                )
+            sys.exit(1)
+
+        file_data = file_level_analysis[file_path]
+
+        # Check if embedding data is available
+        if "embedding_data" not in file_data:
+            console.print("[yellow]⚠️  No embedding data found for this file[/yellow]")
+            console.print(
+                "[dim]This file may not have had similar patterns, or was analyzed "
+                "without domain adherence enabled.[/dim]"
+            )
+            console.print("\n[dim]Showing available analysis data instead:[/dim]")
+            _display_file_summary(file_path, file_data)
+            sys.exit(0)
+
+        embedding_data = file_data["embedding_data"]
+
+        # Reconstruct embeddings from JSON
+        import numpy as np
+
+        query_embedding = np.array(embedding_data["query_embedding"])
+        reference_embeddings = [
+            np.array(pattern["embedding"])
+            for pattern in embedding_data["similar_patterns"]
+        ]
+        reference_codes = [
+            pattern["code_snippet"] for pattern in embedding_data["similar_patterns"]
+        ]
+        query_code = embedding_data.get("query_code", "")
+
+        # Perform full divergence analysis with query code
+        divergence_analysis = _analyze_embeddings_with_full_features(
+            query_embedding=query_embedding,
+            reference_embeddings=reference_embeddings,
+            query_code=query_code,
+            reference_codes=reference_codes,
+            domain=embedding_data["domain"],
+            file_path=file_path,
+        )
+
+        # Display explanation
+        _display_embedding_explanation(
+            file_path=file_path,
+            file_data=file_data,
+            embedding_data=embedding_data,
+            divergence_analysis=divergence_analysis,
+            verbose=verbose,
+        )
+
+    except Exception as e:
+        console.print(f"[red]Error explaining file: {e}[/red]")
+        if verbose:
+            console.print_exception()
+        sys.exit(1)
+
+
+def _analyze_embeddings_with_full_features(
+    query_embedding: Any,
+    reference_embeddings: list[Any],
+    query_code: str,
+    reference_codes: list[str],
+    domain: str,
+    file_path: str,
+) -> dict[str, Any]:
+    """Perform full embedding divergence analysis with code feature extraction.
+
+    Args:
+        query_embedding: NumPy array of query embedding
+        reference_embeddings: List of NumPy arrays for reference embeddings
+        query_code: Source code of the file being explained
+        reference_codes: List of reference code snippets
+        domain: Architectural domain
+        file_path: Path to file
+
+    Returns:
+        Complete divergence analysis results with actionable insights
+    """
+    import numpy as np
+
+    from .embeddings.code_feature_extractor import (
+        compare_features,
+        extract_code_features,
+        generate_feature_insights,
+    )
+
+    # Calculate divergence score
+    if reference_embeddings:
+        avg_ref_embedding = np.mean(reference_embeddings, axis=0)
+        diff_vector = np.abs(query_embedding - avg_ref_embedding)
+        divergence_score = float(np.mean(diff_vector))
+
+        # Top divergent dimensions
+        top_n = 20
+        top_divergent_dims = np.argsort(diff_vector)[-top_n:][::-1]
+
+        dimension_divergence = [
+            {
+                "dimension": int(dim),
+                "divergence": float(diff_vector[dim]),
+                "query_value": float(query_embedding[dim]),
+                "ref_value": float(avg_ref_embedding[dim]),
+            }
+            for dim in top_divergent_dims
+        ]
+    else:
+        divergence_score = 1.0
+        dimension_divergence = []
+
+    # Extract features from query and reference codes
+    query_features = extract_code_features(query_code, file_path)
+    reference_features_list = [
+        extract_code_features(ref_code) for ref_code in reference_codes
+    ]
+
+    # Compare features
+    structural_differences = compare_features(query_features, reference_features_list)
+
+    # Generate actionable insights
+    actionable_insights = generate_feature_insights(
+        structural_differences,
+        query_code,
+        [
+            {"code": code, "features": features}
+            for code, features in zip(
+                reference_codes, reference_features_list, strict=False
+            )
+        ],
+    )
+
+    # Calculate similarity distribution
+    similarity_distribution = []
+    query_norm = query_embedding / (np.linalg.norm(query_embedding) + 1e-9)
+    for ref_emb in reference_embeddings:
+        ref_norm = ref_emb / (np.linalg.norm(ref_emb) + 1e-9)
+        similarity = float(np.dot(query_norm, ref_norm))
+        similarity_distribution.append(similarity)
+
+    # Pattern insights
+    pattern_insights = {
+        "missing_imports": structural_differences.get("imports", {}).get(
+            "missing_common", []
+        ),
+        "import_overlap_ratio": structural_differences.get("imports", {}).get(
+            "overlap_ratio", 0.0
+        ),
+    }
+
+    # Add TypeScript/React specific missing patterns
+    missing_patterns = []
+    for key in ["has_interface", "has_type_annotation", "has_react_import"]:
+        if key in structural_differences:
+            data = structural_differences[key]
+            if data.get("missing"):
+                pattern_name = key.replace("has_", "").replace("_", " ").title()
+                missing_patterns.append(pattern_name)
+
+    if missing_patterns:
+        pattern_insights["missing_patterns"] = missing_patterns
+
+    return {
+        "divergence_score": divergence_score,
+        "structural_differences": structural_differences,
+        "pattern_insights": pattern_insights,
+        "actionable_insights": actionable_insights,
+        "embedding_analysis": {
+            "dimension_divergence": dimension_divergence[:10],
+            "similarity_distribution": similarity_distribution,
+            "avg_similarity": (
+                float(np.mean(similarity_distribution))
+                if similarity_distribution
+                else 0.0
+            ),
+        },
+    }
+
+
+def _display_file_summary(file_path: str, file_data: dict[str, Any]) -> None:
+    """Display basic file analysis summary.
+
+    Args:
+        file_path: Path to the file
+        file_data: File analysis data from results
+    """
+    scores = file_data.get("scores", {})
+
+    if scores:
+        console.print("\n[bold]Analyzer Scores:[/bold]")
+        for analyzer, score in scores.items():
+            score_color = _get_score_color(score)
+            console.print(f"  {analyzer}: [{score_color}]{score:.3f}[/{score_color}]")
+
+
+def _display_embedding_explanation(
+    file_path: str,
+    file_data: dict[str, Any],
+    embedding_data: dict[str, Any],
+    divergence_analysis: dict[str, Any],
+    verbose: bool,
+) -> None:
+    """Display embedding divergence explanation using Rich formatting.
+
+    Args:
+        file_path: Path to the file being explained
+        file_data: File analysis data from results
+        embedding_data: Embedding data (query + references)
+        divergence_analysis: Output from divergence analysis
+        verbose: Show detailed technical information
+    """
+    from pathlib import Path
+
+    # Get scores
+    scores = file_data.get("scores", {})
+    domain_score = scores.get("domain_adherence", 0.0)
+    domain = embedding_data.get("domain", "unknown")
+
+    # Header panel
+    score_color = _get_score_color(domain_score)
+    divergence_score = divergence_analysis.get("divergence_score", 0.0)
+    div_level = (
+        "HIGH"
+        if divergence_score > 0.15
+        else "MEDIUM" if divergence_score > 0.08 else "LOW"
+    )
+
+    header_text = f"""File: {Path(file_path).name}
+Full Path: {file_path}
+Domain: {domain}
+Score: [{score_color}]{domain_score:.3f}[/{score_color}]
+Divergence: {divergence_score:.3f} ({div_level})"""
+
+    console.print(
+        Panel(
+            header_text,
+            title="Embedding Divergence Analysis",
+            border_style=score_color,
+        )
+    )
+
+    # Similar patterns comparison
+    similar_patterns = embedding_data.get("similar_patterns", [])
+    if similar_patterns:
+        console.print("\n[bold]Reference Patterns (Similar Files):[/bold]")
+        ref_table = Table(show_header=True)
+        ref_table.add_column("File", style="cyan")
+        ref_table.add_column("Similarity", justify="right")
+
+        for pattern in similar_patterns[:5]:
+            sim_score = pattern["similarity_score"]
+            sim_color = _get_score_color(sim_score)
+            ref_table.add_row(
+                pattern["file_path"],
+                f"[{sim_color}]{sim_score:.3f}[/{sim_color}]",
+            )
+
+        console.print(ref_table)
+
+    # Embedding analysis
+    emb_analysis = divergence_analysis.get("embedding_analysis", {})
+    avg_similarity = emb_analysis.get("avg_similarity", 0.0)
+
+    console.print(f"\n[bold]Embedding Similarity:[/bold] {avg_similarity:.3f}")
+    console.print(
+        "[dim]This measures how semantically similar your file is to established patterns[/dim]"
+    )
+
+    # Actionable insights
+    insights = divergence_analysis.get("actionable_insights", [])
+    if insights:
+        console.print("\n[bold]Why This File Scores Low:[/bold]")
+
+        for i, insight in enumerate(insights[:5], 1):
+            severity = insight.get("severity", "info")
+            category = insight.get("category", "unknown")
+            message = insight.get("message", "")
+            suggestion = insight.get("suggestion", "")
+            improvement = insight.get("estimated_improvement", 0.0)
+
+            severity_color = _get_severity_color(severity)
+            severity_icon = (
+                "🔴" if severity == "high" else "🟡" if severity == "medium" else "🔵"
+            )
+
+            console.print(
+                f"\n{i}. {severity_icon} [{severity_color}]{category.upper()}[/{severity_color}]"
+            )
+            console.print(f"   {message}")
+            console.print(f"   [dim]✅ {suggestion}[/dim]")
+            if improvement > 0:
+                console.print(f"   [dim]📈 Est. improvement: +{improvement:.2f}[/dim]")
+
+    # Pattern insights
+    pattern_insights = divergence_analysis.get("pattern_insights", {})
+    if pattern_insights and any(pattern_insights.values()):
+        console.print("\n[bold]Pattern Analysis:[/bold]")
+
+        missing_imports = pattern_insights.get("missing_imports", [])
+        if missing_imports:
+            console.print(
+                f"  • Missing common imports: {', '.join(missing_imports[:5])}"
+            )
+
+        missing_patterns = pattern_insights.get("missing_patterns", [])
+        if missing_patterns:
+            console.print(f"  • Missing patterns: {', '.join(missing_patterns)}")
+
+        import_overlap = pattern_insights.get("import_overlap_ratio", 0.0)
+        if import_overlap > 0:
+            console.print(f"  • Import overlap: {import_overlap:.1%}")
+
+    # Verbose: Embedding dimensions
+    if verbose and emb_analysis.get("dimension_divergence"):
+        console.print("\n[bold]Top Divergent Embedding Dimensions:[/bold]")
+        console.print(
+            "[dim]These dimensions differ most from reference patterns:[/dim]\n"
+        )
+
+        dim_table = Table(show_header=True)
+        dim_table.add_column("Dim", justify="right", style="cyan")
+        dim_table.add_column("Query", justify="right")
+        dim_table.add_column("Reference", justify="right")
+        dim_table.add_column("Divergence", justify="right")
+
+        for dim_data in emb_analysis["dimension_divergence"][:10]:
+            dim_table.add_row(
+                str(dim_data["dimension"]),
+                f"{dim_data['query_value']:.4f}",
+                f"{dim_data['ref_value']:.4f}",
+                f"{dim_data['divergence']:.4f}",
+            )
+
+        console.print(dim_table)
+
+    # Footer with next steps
+    console.print("\n[bold]Next Steps:[/bold]")
+    console.print(
+        "[dim]1. Review the actionable insights above and apply suggested fixes[/dim]"
+    )
+    console.print(
+        "[dim]2. Examine the reference files to see established patterns[/dim]"
+    )
+    console.print(
+        "[dim]3. Re-run analysis after changes: sca-analyze analyze HEAD[/dim]"
+    )
+
+
 if __name__ == "__main__":
     cli()
