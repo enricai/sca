@@ -771,8 +771,8 @@ def _display_results(results: dict[str, Any], verbose: bool = False) -> None:
                 file_score_pairs = list(zip(files, scores, strict=True))
                 file_score_pairs.sort(key=lambda x: x[1], reverse=True)
 
-                # Show top 5 (or all if fewer)
-                display_count = min(5, len(file_score_pairs))
+                # Show top 20 (or all if fewer)
+                display_count = min(20, len(file_score_pairs))
 
                 console.print(
                     f"\n  [{domain.title()}] - Top {display_count}/{len(files)} Files"
