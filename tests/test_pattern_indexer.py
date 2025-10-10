@@ -62,6 +62,10 @@ class TestPatternIndexer:
                 "input_ids": Mock(),
                 "attention_mask": Mock(),
             }
+            # Add encode method for token length checking
+            mock_tokenizer_instance.encode.return_value = list(
+                range(100)
+            )  # Return 100 tokens
             mock_tokenizer.from_pretrained.return_value = mock_tokenizer_instance
 
             # Mock model
@@ -187,20 +191,29 @@ export function capitalizeFirst(str: string): string {
         norms = np.linalg.norm(normalized, axis=1)
         np.testing.assert_allclose(norms, 1.0, rtol=1e-5)
 
-    def test_chunk_content(self, indexer: PatternIndexer) -> None:
-        """Test content chunking functionality."""
-        # Test short content (should return as single chunk)
-        short_content = "const x = 1;\nconst y = 2;"
-        chunks = indexer._chunk_content(short_content, max_tokens=100)
-        assert len(chunks) == 1
-        assert chunks[0] == short_content
+    def test_function_extraction(self, indexer: PatternIndexer) -> None:
+        """Test function-level content extraction via FunctionExtractor."""
+        # Test Python function extraction
+        python_content = """
+import os
+import sys
 
-        # Test long content (should be chunked)
-        long_lines = ["const line" + str(i) + " = " + str(i) + ";" for i in range(200)]
-        long_content = "\n".join(long_lines)
-        chunks = indexer._chunk_content(long_content, max_tokens=50)
-        assert len(chunks) > 1
-        assert all(len(chunk) > 0 for chunk in chunks)
+def test_function():
+    return 42
+
+class MyClass:
+    def method(self):
+        pass
+"""
+        function_chunks = indexer.function_extractor.extract_functions(
+            "test.py", python_content
+        )
+
+        # Should extract at least the function and method
+        # (fallback returns 1 chunk if tree-sitter not available)
+        assert len(function_chunks) >= 1
+        assert all(hasattr(chunk, "function_code") for chunk in function_chunks)
+        assert all(hasattr(chunk, "function_name") for chunk in function_chunks)
 
     def test_build_domain_index(
         self, indexer: PatternIndexer, sample_codebase_files: dict[str, str]

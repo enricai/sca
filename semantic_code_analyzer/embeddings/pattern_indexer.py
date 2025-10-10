@@ -48,6 +48,7 @@ from transformers import RobertaModel, RobertaTokenizer
 
 from ..hardware.device_manager import DeviceManager, DeviceType
 from ..hardware.exceptions import FallbackError, ModelLoadingError
+from ..parsing import FunctionExtractor
 
 logger = logging.getLogger(__name__)
 
@@ -83,6 +84,8 @@ class PatternIndex:
     code_snippets: list[str]
     embeddings: np.ndarray[Any, np.dtype[np.floating[Any]]]
     metadata: dict[str, Any]
+    function_names: list[str] | None = None  # Function names for each chunk
+    is_methods: list[bool] | None = None  # Whether each chunk is a method
 
 
 class PatternIndexer:
@@ -428,6 +431,11 @@ class PatternIndexer:
         self.embedding_cache: dict[str, np.ndarray[Any, np.dtype[np.floating[Any]]]] = (
             {}
         )
+
+        # Initialize function extractor for AST-based chunking
+        report_progress("Initializing function extractor...")
+        self.function_extractor = FunctionExtractor()
+        logger.info("FunctionExtractor initialized")
 
         # Performance metrics tracking
         self._performance_metrics = {
@@ -890,28 +898,62 @@ class PatternIndexer:
             else codebase_files
         )
 
-        # Extract embeddings for all files
+        # Extract embeddings for all files using function-level chunking
         embeddings_list = []
         file_paths = []
         code_snippets = []
+        function_names = []
+        is_methods = []
 
         for file_path, content in files_to_process.items():
             try:
-                # Process content in chunks if too large
-                content_chunks = self._chunk_content(content, chunk_size)
+                # Extract functions using tree-sitter
+                function_chunks = self.function_extractor.extract_functions(
+                    file_path, content
+                )
 
-                for i, chunk in enumerate(content_chunks):
-                    cache_key = f"{domain}:{file_path}:{i}:{hash(chunk)}"
+                for func_chunk in function_chunks:
+                    # Check token length
+                    chunk_code = func_chunk.code
+                    tokens = self.tokenizer.encode(chunk_code, truncation=False)
 
+                    # If too long, try function without imports
+                    if len(tokens) > chunk_size:
+                        logger.debug(
+                            f"Function {func_chunk.function_name} in {file_path} "
+                            f"exceeds {chunk_size} tokens ({len(tokens)}), trying without imports"
+                        )
+                        # Try just the function code without imports
+                        func_code_only = func_chunk.function_code
+                        tokens_without_imports = self.tokenizer.encode(
+                            func_code_only, truncation=False
+                        )
+
+                        if len(tokens_without_imports) > chunk_size:
+                            logger.warning(
+                                f"Skipping function {func_chunk.function_name} in {file_path}: "
+                                f"still too long ({len(tokens_without_imports)} tokens)"
+                            )
+                            continue
+                        else:
+                            chunk_code = func_code_only
+
+                    # Generate cache key
+                    cache_key = f"{domain}:{file_path}:{func_chunk.function_name}:{hash(chunk_code)}"
+
+                    # Get or generate embedding
                     if cache_key in self.embedding_cache:
                         embedding = self.embedding_cache[cache_key]
                     else:
-                        embedding = self._extract_code_embeddings(chunk)
+                        embedding = self._extract_code_embeddings(chunk_code)
                         self.embedding_cache[cache_key] = embedding
 
+                    # Store function metadata
                     embeddings_list.append(embedding)
                     file_paths.append(file_path)
-                    code_snippets.append(chunk)
+                    code_snippets.append(chunk_code)
+                    function_names.append(func_chunk.function_name)
+                    is_methods.append(func_chunk.is_method)
 
             except Exception as e:
                 logger.warning(f"Failed to process {file_path}: {e}")
@@ -932,7 +974,7 @@ class PatternIndexer:
         index = faiss.IndexFlatIP(dimension)  # Inner product for cosine similarity
         index.add(embeddings_matrix)
 
-        # Store the pattern index
+        # Store the pattern index with function metadata
         pattern_index = PatternIndex(
             domain=domain,
             index=index,
@@ -944,7 +986,10 @@ class PatternIndexer:
                 "embedding_dimension": dimension,
                 "model_name": self.model_name,
                 "chunk_size": chunk_size,
+                "chunking_strategy": "function-level",
             },
+            function_names=function_names,
+            is_methods=is_methods,
         )
 
         self.domain_indices[domain] = pattern_index
@@ -1243,39 +1288,6 @@ class PatternIndexer:
         norms = np.where(norms == 0, 1, norms)  # Avoid division by zero
         return embeddings / norms
 
-    def _chunk_content(self, content: str, max_tokens: int = 512) -> list[str]:
-        """Split content into chunks that fit within token limits.
-
-        Args:
-            content: Source code content
-            max_tokens: Maximum tokens per chunk
-
-        Returns:
-            List of content chunks
-        """
-        # Simple line-based chunking for now
-        lines = content.split("\n")
-        chunks = []
-        current_chunk: list[str] = []
-        current_length = 0
-
-        for line in lines:
-            # Rough token estimation (1 token ≈ 4 characters)
-            line_tokens = len(line) // 4 + 1
-
-            if current_length + line_tokens > max_tokens and current_chunk:
-                chunks.append("\n".join(current_chunk))
-                current_chunk = [line]
-                current_length = line_tokens
-            else:
-                current_chunk.append(line)
-                current_length += line_tokens
-
-        if current_chunk:
-            chunks.append("\n".join(current_chunk))
-
-        return chunks if chunks else [content[:2000]]  # Fallback for very long lines
-
     def _save_domain_index(self, pattern_index: PatternIndex) -> None:
         """Save a domain index to disk for caching using JSON serialization.
 
@@ -1294,7 +1306,9 @@ class PatternIndexer:
                     pattern_index.embeddings
                 ),
                 "metadata": pattern_index.metadata,
-                "format_version": "json_v1",  # For future compatibility
+                "function_names": pattern_index.function_names or [],
+                "is_methods": pattern_index.is_methods or [],
+                "format_version": "json_v2",  # Updated for function-level chunking
             }
 
             with open(index_path, "w", encoding="utf-8") as f:
@@ -1342,6 +1356,10 @@ class PatternIndexer:
             index = faiss.IndexFlatIP(dimension)
             index.add(embeddings)
 
+            # Load function metadata if available (new format)
+            function_names = index_data.get("function_names")
+            is_methods = index_data.get("is_methods")
+
             pattern_index = PatternIndex(
                 domain=index_data["domain"],
                 index=index,
@@ -1349,6 +1367,8 @@ class PatternIndexer:
                 code_snippets=index_data["code_snippets"],
                 embeddings=embeddings,
                 metadata=index_data["metadata"],
+                function_names=function_names,
+                is_methods=is_methods,
             )
 
             self.domain_indices[domain] = pattern_index

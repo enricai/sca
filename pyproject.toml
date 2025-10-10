@@ -47,6 +47,12 @@ dependencies = [
     "transformers>=4.30.0",
     "faiss-cpu>=1.7.4",
     "accelerate>=0.25.0",
+
+    # AST parsing for function-level chunking
+    "tree-sitter>=0.21.0",
+    "tree-sitter-python>=0.21.0",
+    "tree-sitter-javascript>=0.21.0",
+    "tree-sitter-typescript>=0.21.0",
 ]
 
 [project.optional-dependencies]
@@ -148,9 +154,20 @@ warn_unused_ignores = true
 [[tool.mypy.overrides]]
 module = [
     "semantic_code_analyzer.embeddings.pattern_indexer",
-    "semantic_code_analyzer.scorers.multi_dimensional_scorer"
+    "semantic_code_analyzer.scorers.multi_dimensional_scorer",
+    "semantic_code_analyzer.parsing.function_extractor"
 ]
 warn_unused_ignores = false
+
+# Ignore missing type stubs for tree-sitter libraries
+[[tool.mypy.overrides]]
+module = [
+    "tree_sitter",
+    "tree_sitter_python",
+    "tree_sitter_javascript",
+    "tree_sitter_typescript"
+]
+ignore_missing_imports = true
 
 # Pytest configuration
 [tool.pytest.ini_options]

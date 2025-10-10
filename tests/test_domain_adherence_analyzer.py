@@ -67,6 +67,12 @@ class TestDomainAwareAdherenceAnalyzer:
             mock_indexer_instance = Mock()
             mock_indexer_instance.domain_indices = {"frontend": Mock()}
             mock_indexer_instance.search_similar_patterns.return_value = []
+
+            # Mock function extractor to return empty list
+            mock_function_extractor = Mock()
+            mock_function_extractor.extract_functions.return_value = []
+            mock_indexer_instance.function_extractor = mock_function_extractor
+
             mock_indexer.return_value = mock_indexer_instance
 
             yield {

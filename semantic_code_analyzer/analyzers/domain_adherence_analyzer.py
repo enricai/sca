@@ -323,7 +323,19 @@ class DomainAwareAdherenceAnalyzer(BaseAnalyzer):
         domain_classification: DomainClassificationResult,
         file_path: str = "",
     ) -> AdherenceAnalysisResult:
-        """Perform comprehensive domain-aware adherence analysis.
+        """Perform comprehensive domain-aware adherence analysis using function-level scoring.
+
+        This method implements the function-level chunking and top-5 averaging strategy:
+        1. Extract functions from the code using tree-sitter AST parsing
+        2. For each function, find the top-5 most similar functions in the reference corpus
+        3. Average the similarities of those top-5 matches to get the function's score
+        4. Average all function scores to get the overall file adherence score
+
+        This approach provides more granular and robust scoring compared to whole-file
+        similarity, as it:
+        - Matches at the function level (natural unit of code)
+        - Uses top-5 averaging to reduce sensitivity to outliers
+        - Provides consistent granularity across different file sizes
 
         Args:
             code_content: Code content to analyze
@@ -331,7 +343,7 @@ class DomainAwareAdherenceAnalyzer(BaseAnalyzer):
             file_path: Optional file path for context
 
         Returns:
-            AdherenceAnalysisResult with detailed analysis
+            AdherenceAnalysisResult with detailed analysis including function-level scores
         """
         domain = domain_classification.domain
         domain_str = domain.value
@@ -347,22 +359,66 @@ class DomainAwareAdherenceAnalyzer(BaseAnalyzer):
             )
             self._warned_domains.add(domain_str)
 
-        # Search for similar patterns
-        similar_patterns = []
+        # Search for similar patterns using function-level chunking
+        similar_patterns: list[SimilarityMatch] = []
+        function_scores: list[float] = []
+
         if (
             self.pattern_indexer is not None
             and domain_str in self.pattern_indexer.domain_indices
         ):
-            similar_patterns = self.pattern_indexer.search_similar_patterns(
-                query_code=code_content,
-                domain=domain_str,
-                top_k=self.max_similar_patterns,
-                min_similarity=self.similarity_threshold,
+            # Extract functions from the code content
+            function_chunks = self.pattern_indexer.function_extractor.extract_functions(
+                file_path, code_content
             )
 
+            logger.debug(
+                f"Extracted {len(function_chunks)} functions from {file_path} for scoring"
+            )
+
+            # Score each function using top-5 averaging
+            for func_chunk in function_chunks:
+                # Search for top-k similar patterns for this function
+                func_similar_patterns = self.pattern_indexer.search_similar_patterns(
+                    query_code=func_chunk.code,
+                    domain=domain_str,
+                    top_k=5,  # Get top-5 for averaging
+                    min_similarity=self.similarity_threshold,
+                )
+
+                if func_similar_patterns:
+                    # Average the top-5 similarities for this function
+                    func_score = sum(
+                        p.similarity_score for p in func_similar_patterns
+                    ) / len(func_similar_patterns)
+                    function_scores.append(func_score)
+
+                    logger.debug(
+                        f"Function {func_chunk.function_name}: {len(func_similar_patterns)} matches, "
+                        f"score={func_score:.4f}"
+                    )
+
+                    # Keep similar patterns for the first function (for reporting)
+                    if not similar_patterns and len(func_similar_patterns) > 0:
+                        similar_patterns = func_similar_patterns
+
         # Calculate adherence scores
+        # If we have function-level scores, use their average
+        # Otherwise fall back to whole-file similarity
+        if function_scores:
+            overall_function_score = sum(function_scores) / len(function_scores)
+            logger.info(
+                f"Function-level scoring: {len(function_scores)} functions, "
+                f"average score={overall_function_score:.4f}"
+            )
+        else:
+            overall_function_score = None
+
         adherence_score = self._calculate_detailed_adherence_scores(
-            code_content, domain_classification, similar_patterns
+            code_content,
+            domain_classification,
+            similar_patterns,
+            overall_function_score=overall_function_score,
         )
 
         # Generate improvement suggestions
@@ -460,6 +516,7 @@ class DomainAwareAdherenceAnalyzer(BaseAnalyzer):
         code_content: str,
         domain_classification: DomainClassificationResult,
         similar_patterns: list[SimilarityMatch],
+        overall_function_score: float | None = None,
     ) -> AdherenceScore:
         """Calculate detailed adherence scores based on similarity analysis.
 
@@ -467,6 +524,7 @@ class DomainAwareAdherenceAnalyzer(BaseAnalyzer):
             code_content: Code content being analyzed
             domain_classification: Domain classification result
             similar_patterns: Similar patterns found in the domain
+            overall_function_score: Pre-computed score from function-level analysis (optional)
 
         Returns:
             AdherenceScore with detailed metrics
@@ -474,14 +532,22 @@ class DomainAwareAdherenceAnalyzer(BaseAnalyzer):
         # Domain match quality based on classification confidence
         domain_match_quality = domain_classification.confidence
 
-        # Pattern similarity based on similar patterns found
-        if similar_patterns:
+        # Pattern similarity - use function-level score if available
+        if overall_function_score is not None:
+            # Use the pre-computed function-level score (top-5 averaging per function)
+            pattern_similarity = overall_function_score
+            max_similarity = overall_function_score  # Approximation
+
+            logger.debug("=== FUNCTION-LEVEL SCORING ===")
+            logger.debug(f"Using function-level score: {pattern_similarity:.4f}")
+        elif similar_patterns:
+            # Fallback to old method if function scoring not available
             similarity_scores = [match.similarity_score for match in similar_patterns]
             pattern_similarity = statistics.mean(similarity_scores)
             max_similarity = max(similarity_scores)
 
             # Debug logging
-            logger.debug("=== PATTERN SIMILARITY ===")
+            logger.debug("=== PATTERN SIMILARITY (FALLBACK) ===")
             logger.debug(f"Found {len(similar_patterns)} similar patterns")
             logger.debug(
                 f"Individual scores: {[f'{s:.4f}' for s in similarity_scores[:5]]}"
