@@ -1228,11 +1228,9 @@ def explain(
     from_results: str,
     verbose: bool,
 ) -> None:
-    """Explain why a specific file scored low using cached analysis results.
+    """Explain embedding divergence for a file using cached analysis results.
 
-    This command provides detailed insights into embedding divergence,
-    structural differences, and actionable recommendations for improving
-    a file's adherence score.
+    Shows embedding similarity metrics comparing your file to reference patterns.
 
     Example:
         sca-analyze analyze HEAD --output results.json
@@ -1287,19 +1285,10 @@ def explain(
             np.array(pattern["embedding"])
             for pattern in embedding_data["similar_patterns"]
         ]
-        reference_codes = [
-            pattern["code_snippet"] for pattern in embedding_data["similar_patterns"]
-        ]
-        query_code = embedding_data.get("query_code", "")
-
-        # Perform full divergence analysis with query code
-        divergence_analysis = _analyze_embeddings_with_full_features(
+        # Perform embedding divergence analysis (only embedding-derived metrics)
+        divergence_analysis = _analyze_embedding_divergence(
             query_embedding=query_embedding,
             reference_embeddings=reference_embeddings,
-            query_code=query_code,
-            reference_codes=reference_codes,
-            domain=embedding_data["domain"],
-            file_path=file_path,
         )
 
         # Display explanation
@@ -1318,34 +1307,20 @@ def explain(
         sys.exit(1)
 
 
-def _analyze_embeddings_with_full_features(
+def _analyze_embedding_divergence(
     query_embedding: Any,
     reference_embeddings: list[Any],
-    query_code: str,
-    reference_codes: list[str],
-    domain: str,
-    file_path: str,
 ) -> dict[str, Any]:
-    """Perform full embedding divergence analysis with code feature extraction.
+    """Analyze embedding divergence using only embedding-derived metrics.
 
     Args:
         query_embedding: NumPy array of query embedding
         reference_embeddings: List of NumPy arrays for reference embeddings
-        query_code: Source code of the file being explained
-        reference_codes: List of reference code snippets
-        domain: Architectural domain
-        file_path: Path to file
 
     Returns:
-        Complete divergence analysis results with actionable insights
+        Embedding-derived divergence analysis (no assumptions or interpretations)
     """
     import numpy as np
-
-    from .embeddings.code_feature_extractor import (
-        compare_features,
-        extract_code_features,
-        generate_feature_insights,
-    )
 
     # Calculate divergence score
     if reference_embeddings:
@@ -1366,74 +1341,28 @@ def _analyze_embeddings_with_full_features(
             }
             for dim in top_divergent_dims
         ]
+
+        # Calculate similarity distribution
+        similarity_distribution = []
+        query_norm = query_embedding / (np.linalg.norm(query_embedding) + 1e-9)
+        for ref_emb in reference_embeddings:
+            ref_norm = ref_emb / (np.linalg.norm(ref_emb) + 1e-9)
+            similarity = float(np.dot(query_norm, ref_norm))
+            similarity_distribution.append(similarity)
+
+        avg_similarity = float(np.mean(similarity_distribution))
     else:
         divergence_score = 1.0
         dimension_divergence = []
-
-    # Extract features from query and reference codes
-    query_features = extract_code_features(query_code, file_path)
-    reference_features_list = [
-        extract_code_features(ref_code) for ref_code in reference_codes
-    ]
-
-    # Compare features
-    structural_differences = compare_features(query_features, reference_features_list)
-
-    # Generate actionable insights
-    actionable_insights = generate_feature_insights(
-        structural_differences,
-        query_code,
-        [
-            {"code": code, "features": features}
-            for code, features in zip(
-                reference_codes, reference_features_list, strict=False
-            )
-        ],
-    )
-
-    # Calculate similarity distribution
-    similarity_distribution = []
-    query_norm = query_embedding / (np.linalg.norm(query_embedding) + 1e-9)
-    for ref_emb in reference_embeddings:
-        ref_norm = ref_emb / (np.linalg.norm(ref_emb) + 1e-9)
-        similarity = float(np.dot(query_norm, ref_norm))
-        similarity_distribution.append(similarity)
-
-    # Pattern insights
-    pattern_insights = {
-        "missing_imports": structural_differences.get("imports", {}).get(
-            "missing_common", []
-        ),
-        "import_overlap_ratio": structural_differences.get("imports", {}).get(
-            "overlap_ratio", 0.0
-        ),
-    }
-
-    # Add TypeScript/React specific missing patterns
-    missing_patterns = []
-    for key in ["has_interface", "has_type_annotation", "has_react_import"]:
-        if key in structural_differences:
-            data = structural_differences[key]
-            if data.get("missing"):
-                pattern_name = key.replace("has_", "").replace("_", " ").title()
-                missing_patterns.append(pattern_name)
-
-    if missing_patterns:
-        pattern_insights["missing_patterns"] = missing_patterns
+        similarity_distribution = []
+        avg_similarity = 0.0
 
     return {
         "divergence_score": divergence_score,
-        "structural_differences": structural_differences,
-        "pattern_insights": pattern_insights,
-        "actionable_insights": actionable_insights,
         "embedding_analysis": {
             "dimension_divergence": dimension_divergence[:10],
             "similarity_distribution": similarity_distribution,
-            "avg_similarity": (
-                float(np.mean(similarity_distribution))
-                if similarity_distribution
-                else 0.0
-            ),
+            "avg_similarity": avg_similarity,
         },
     }
 
@@ -1522,54 +1451,18 @@ Divergence: {divergence_score:.3f} ({div_level})"""
     emb_analysis = divergence_analysis.get("embedding_analysis", {})
     avg_similarity = emb_analysis.get("avg_similarity", 0.0)
 
-    console.print(f"\n[bold]Embedding Similarity:[/bold] {avg_similarity:.3f}")
+    console.print(f"\n[bold]Average Embedding Similarity:[/bold] {avg_similarity:.3f}")
     console.print(
-        "[dim]This measures how semantically similar your file is to established patterns[/dim]"
+        "[dim]Cosine similarity between your file's embedding and reference patterns[/dim]"
     )
 
-    # Actionable insights
-    insights = divergence_analysis.get("actionable_insights", [])
-    if insights:
-        console.print("\n[bold]Why This File Scores Low:[/bold]")
-
-        for i, insight in enumerate(insights[:5], 1):
-            severity = insight.get("severity", "info")
-            category = insight.get("category", "unknown")
-            message = insight.get("message", "")
-            suggestion = insight.get("suggestion", "")
-            improvement = insight.get("estimated_improvement", 0.0)
-
-            severity_color = _get_severity_color(severity)
-            severity_icon = (
-                "🔴" if severity == "high" else "🟡" if severity == "medium" else "🔵"
-            )
-
-            console.print(
-                f"\n{i}. {severity_icon} [{severity_color}]{category.upper()}[/{severity_color}]"
-            )
-            console.print(f"   {message}")
-            console.print(f"   [dim]✅ {suggestion}[/dim]")
-            if improvement > 0:
-                console.print(f"   [dim]📈 Est. improvement: +{improvement:.2f}[/dim]")
-
-    # Pattern insights
-    pattern_insights = divergence_analysis.get("pattern_insights", {})
-    if pattern_insights and any(pattern_insights.values()):
-        console.print("\n[bold]Pattern Analysis:[/bold]")
-
-        missing_imports = pattern_insights.get("missing_imports", [])
-        if missing_imports:
-            console.print(
-                f"  • Missing common imports: {', '.join(missing_imports[:5])}"
-            )
-
-        missing_patterns = pattern_insights.get("missing_patterns", [])
-        if missing_patterns:
-            console.print(f"  • Missing patterns: {', '.join(missing_patterns)}")
-
-        import_overlap = pattern_insights.get("import_overlap_ratio", 0.0)
-        if import_overlap > 0:
-            console.print(f"  • Import overlap: {import_overlap:.1%}")
+    # Similarity distribution
+    sim_dist = emb_analysis.get("similarity_distribution", [])
+    if sim_dist:
+        console.print("\n[bold]Similarity to Each Reference:[/bold]")
+        for i, sim in enumerate(sim_dist, 1):
+            sim_color = _get_score_color(sim)
+            console.print(f"  {i}. [{sim_color}]{sim:.3f}[/{sim_color}]")
 
     # Verbose: Embedding dimensions
     if verbose and emb_analysis.get("dimension_divergence"):
@@ -1594,16 +1487,17 @@ Divergence: {divergence_score:.3f} ({div_level})"""
 
         console.print(dim_table)
 
-    # Footer with next steps
-    console.print("\n[bold]Next Steps:[/bold]")
+    # Footer
+    console.print("\n[bold]Interpretation:[/bold]")
     console.print(
-        "[dim]1. Review the actionable insights above and apply suggested fixes[/dim]"
+        "[dim]The divergence score and dimension differences show which parts of the "
+        "768-dimensional embedding space differ most from reference patterns.[/dim]"
     )
     console.print(
-        "[dim]2. Examine the reference files to see established patterns[/dim]"
+        "[dim]Higher divergence = more semantically different from established code patterns.[/dim]"
     )
     console.print(
-        "[dim]3. Re-run analysis after changes: sca-analyze analyze HEAD[/dim]"
+        "\n[dim]To improve: Examine reference files to understand established patterns.[/dim]"
     )
 
 

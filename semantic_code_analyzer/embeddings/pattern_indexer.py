@@ -1382,34 +1382,17 @@ class PatternIndexer:
         self,
         query_embedding: np.ndarray[Any, np.dtype[np.floating[Any]]],
         reference_embeddings: list[np.ndarray[Any, np.dtype[np.floating[Any]]]],
-        query_code: str,
-        reference_codes: list[str],
-        domain: str,
-        file_path: str = "",
     ) -> dict[str, Any]:
-        """Analyze why embeddings differ and generate actionable insights.
+        """Analyze embedding divergence using only embedding-derived metrics.
 
         Args:
             query_embedding: Embedding vector for the file being explained
             reference_embeddings: Embeddings from similar patterns
-            query_code: Source code of the file being explained
-            reference_codes: Source code of reference patterns
-            domain: Architectural domain
-            file_path: Path to file (for context)
 
         Returns:
-            Dictionary with divergence analysis, structural differences,
-            pattern insights, and actionable recommendations
+            Dictionary with embedding-derived divergence metrics only
         """
-        from .code_feature_extractor import (
-            compare_features,
-            extract_code_features,
-            generate_feature_insights,
-        )
-
-        logger.info(
-            f"Analyzing embedding divergence for {file_path} in domain {domain}"
-        )
+        logger.info("Analyzing embedding divergence")
 
         # Calculate embedding divergence score
         if reference_embeddings:
@@ -1435,84 +1418,32 @@ class PatternIndexer:
                 }
                 for dim in top_divergent_dims
             ]
+
+            # Calculate similarity distribution
+            similarity_distribution = []
+            query_norm = query_embedding / (np.linalg.norm(query_embedding) + 1e-9)
+            for ref_emb in reference_embeddings:
+                ref_norm = ref_emb / (np.linalg.norm(ref_emb) + 1e-9)
+                similarity = float(np.dot(query_norm, ref_norm))
+                similarity_distribution.append(similarity)
+
+            avg_similarity = float(np.mean(similarity_distribution))
         else:
             divergence_score = 1.0  # Max divergence if no references
             dimension_divergence = []
-
-        # Extract code features
-        query_features = extract_code_features(query_code, file_path)
-        reference_features_list = [
-            extract_code_features(ref_code) for ref_code in reference_codes
-        ]
-
-        # Compare features
-        structural_differences = compare_features(
-            query_features, reference_features_list
-        )
-
-        # Generate actionable insights
-        actionable_insights = generate_feature_insights(
-            structural_differences,
-            query_code,
-            [
-                {"code": code, "features": features}
-                for code, features in zip(
-                    reference_codes, reference_features_list, strict=False
-                )
-            ],
-        )
-
-        # Calculate similarity distribution
-        similarity_distribution = []
-        query_norm = query_embedding / (np.linalg.norm(query_embedding) + 1e-9)
-        for ref_emb in reference_embeddings:
-            ref_norm = ref_emb / (np.linalg.norm(ref_emb) + 1e-9)
-            similarity = float(np.dot(query_norm, ref_norm))
-            similarity_distribution.append(similarity)
-
-        # Pattern insights
-        pattern_insights = {
-            "missing_imports": structural_differences.get("imports", {}).get(
-                "missing_common", []
-            ),
-            "import_overlap_ratio": structural_differences.get("imports", {}).get(
-                "overlap_ratio", 0.0
-            ),
-            "vocabulary_overlap": query_features.get("keyword_diversity", 0.0),
-        }
-
-        # Add TypeScript/React specific missing patterns
-        missing_patterns = []
-        for key in ["has_interface", "has_type_annotation", "has_react_import"]:
-            if key in structural_differences:
-                data = structural_differences[key]
-                if data.get("missing"):
-                    pattern_name = key.replace("has_", "").replace("_", " ").title()
-                    missing_patterns.append(pattern_name)
-
-        if missing_patterns:
-            pattern_insights["missing_patterns"] = missing_patterns
+            similarity_distribution = []
+            avg_similarity = 0.0
 
         result = {
             "divergence_score": divergence_score,
-            "structural_differences": structural_differences,
-            "pattern_insights": pattern_insights,
-            "actionable_insights": actionable_insights,
             "embedding_analysis": {
                 "dimension_divergence": dimension_divergence[:10],  # Top 10
                 "similarity_distribution": similarity_distribution,
-                "avg_similarity": (
-                    float(np.mean(similarity_distribution))
-                    if similarity_distribution
-                    else 0.0
-                ),
+                "avg_similarity": avg_similarity,
             },
         }
 
-        logger.info(
-            f"Divergence analysis complete: score={divergence_score:.3f}, "
-            f"insights={len(actionable_insights)}"
-        )
+        logger.info(f"Divergence analysis complete: score={divergence_score:.3f}")
 
         return result
 

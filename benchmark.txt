@@ -1,0 +1,778 @@
+## REFERENCE
+
+(sca) andres@mac:~/src/enric/sca$ sca-analyze analyze dbc9a233ca092c928d0c1dfd25a9881d97370a02 --repo-path ~/src/enric/web-3
+Analyzing commit: dbc9a233ca092c928d0c1dfd25a9881d97370a02
+📊 Using semantic embeddings for analysis (add --enable-regex-analyzers for multi-dimensional mode)
+🔍 Running pre-analysis hardware health check...
+✅ Hardware health check passed
+⚡ Using: Apple Silicon MPS (m3) (24.0GB memory)
+📊 Performance: MPS acceleration active on m3
+⠙ Domain analyzer: Model loading: Loading GraphCodeBERT model (this is the slow step)... 0:00:01Some weights of RobertaModel were not initialized from the model checkpoint at microsoft/graphcodebert-base and are newly initialized: ['pooler.dense.bias', 'pooler.dense.weight']
+You should probably TRAIN this model on a down-stream task to be able to use it for predictions and inference.
+⠋ Aggregating results... 0:02:08
+Analysis completed in 125.74s
+╭────────────────────────────────────────────────────────────────────────────────────────────── Analysis Results ──────────────────────────────────────────────────────────────────────────────────────────────╮
+│ Overall Adherence: 0.926                                                                                                                                                                                     │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+             Dimensional Scores
+┏━━━━━━━━━━━━━━━━━━┳━━━━━━━┳━━━━━━━━━━━━━━━━┓
+┃ Dimension        ┃ Score ┃ Interpretation ┃
+┡━━━━━━━━━━━━━━━━━━╇━━━━━━━╇━━━━━━━━━━━━━━━━┩
+│ Domain_Adherence │ 0.926 │ Excellent      │
+└──────────────────┴───────┴────────────────┘
+
+
+                                 Domain Breakdown
+┏━━━━━━━━━━━━━━━┳━━━━━━━┳━━━━━━━━━━━┳━━━━━━━━━━━┳━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━┓
+┃ Domain        ┃ Files ┃ Avg Score ┃     Range ┃ Weight ┃ Interpretation         ┃
+┡━━━━━━━━━━━━━━━╇━━━━━━━╇━━━━━━━━━━━╇━━━━━━━━━━━╇━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━┩
+│ Frontend      │     6 │     0.931 │ 0.86-0.99 │   🟢   │ Excellent              │
+│ Configuration │     3 │     0.918 │ 0.88-0.94 │   🔴   │ Excellent (low weight) │
+│ Unknown       │     2 │     0.000 │ 0.00-0.00 │   🟡   │ Poor                   │
+└───────────────┴───────┴───────────┴───────────┴────────┴────────────────────────┘
+
+File Details by Domain:
+
+  [Frontend] - Top 5/6 Files
+    1. 0.989 - src/app//offer/enric/layout.tsx
+    2. 0.968 - src/styles/offer.css
+    3. 0.948 - src/app//offer/enric/page.tsx
+    4. 0.930 - src/components/TestimonialSectionFull.tsx
+    5. 0.885 - src/app//layout.tsx
+
+Pattern Analysis:
+  Total patterns found: 36
+  Average confidence: 0.939
+  Patterns by type:
+    architectural: 36
+
+Top Issues by Domain:
+
+Top Recommendations:
+  1. INFO: Consider patterns from messages/en.json (similarity: 0.94)
+     Fix: Apply suggested improvement
+  2. INFO: Consider patterns from messages/es.json (similarity: 0.94)
+     Fix: Apply suggested improvement
+  3. INFO: Consider patterns from src/app//layout.tsx (similarity: 0.91)
+     Fix: Apply suggested improvement
+  4. INFO: Consider patterns from src/app//solutions/brand-cloning/layout.tsx (similarity: 0.99)
+     Fix: Apply suggested improvement
+  5. INFO: Consider patterns from src/app//privacy-policy/page.tsx (similarity: 0.96)
+     Fix: Apply suggested improvement
+
+
+## DEVIN
+
+(sca) andres@mac:~/src/enric/sca$ sca-analyze analyze 8516107e683fa99455cb8f3bf8db48688f274368 --repo-path ~/src/enric/web-3
+
+Analyzing commit: 8516107e683fa99455cb8f3bf8db48688f274368
+📊 Using semantic embeddings for analysis (add --enable-regex-analyzers for multi-dimensional mode)
+🔍 Running pre-analysis hardware health check...
+✅ Hardware health check passed
+⚡ Using: Apple Silicon MPS (m3) (24.0GB memory)
+📊 Performance: MPS acceleration active on m3
+⠴ Domain analyzer: Model loading: Loading GraphCodeBERT model (this is the slow step)... 0:00:01Some weights of RobertaModel were not initialized from the model checkpoint at microsoft/graphcodebert-base and are newly initialized: ['pooler.dense.bias', 'pooler.dense.weight']
+You should probably TRAIN this model on a down-stream task to be able to use it for predictions and inference.
+⠼ Aggregating results... 0:08:20
+Analysis completed in 496.53s
+╭────────────────────────────────────────────────────────────────────────────────────────────── Analysis Results ──────────────────────────────────────────────────────────────────────────────────────────────╮
+│ Overall Adherence: 0.905                                                                                                                                                                                     │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+             Dimensional Scores
+┏━━━━━━━━━━━━━━━━━━┳━━━━━━━┳━━━━━━━━━━━━━━━━┓
+┃ Dimension        ┃ Score ┃ Interpretation ┃
+┡━━━━━━━━━━━━━━━━━━╇━━━━━━━╇━━━━━━━━━━━━━━━━┩
+│ Domain_Adherence │ 0.905 │ Excellent      │
+└──────────────────┴───────┴────────────────┘
+
+
+                           Domain Breakdown
+┏━━━━━━━━━━┳━━━━━━━┳━━━━━━━━━━━┳━━━━━━━━━━━┳━━━━━━━━┳━━━━━━━━━━━━━━━━┓
+┃ Domain   ┃ Files ┃ Avg Score ┃     Range ┃ Weight ┃ Interpretation ┃
+┡━━━━━━━━━━╇━━━━━━━╇━━━━━━━━━━━╇━━━━━━━━━━━╇━━━━━━━━╇━━━━━━━━━━━━━━━━┩
+│ Backend  │     3 │     0.920 │ 0.91-0.93 │   🟢   │ Excellent      │
+│ Frontend │     2 │     0.883 │ 0.85-0.91 │   🟢   │ Very Good      │
+└──────────┴───────┴───────────┴───────────┴────────┴────────────────┘
+
+File Details by Domain:
+
+  [Backend] - Top 3/3 Files
+    1. 0.928 - src/app/api/github/user-repos/route.ts
+    2. 0.916 - src/app/api/github/repo-branches/route.ts
+    3. 0.915 - src/app/api/github/repo-pulls/route.ts
+
+  [Frontend] - Top 2/2 Files
+    1. 0.913 - src/components/admin/TaskDashboard.tsx
+    2. 0.854 - src/components/ui/TaskItem.tsx
+
+Pattern Analysis:
+  Total patterns found: 20
+  Average confidence: 0.914
+  Patterns by type:
+    architectural: 20
+
+Top Issues by Domain:
+
+Top Recommendations:
+  1. INFO: Consider patterns from src/app/api/dashboard/route.ts (similarity: 0.94)
+     Fix: Apply suggested improvement
+  2. INFO: Consider patterns from src/app/api/dashboard/route.ts (similarity: 0.94)
+     Fix: Apply suggested improvement
+  3. INFO: Consider patterns from src/app/api/dashboard/route.ts (similarity: 0.96)
+     Fix: Apply suggested improvement
+  4. INFO: Consider patterns from src/components/BookNowForm.tsx (similarity: 0.93)
+     Fix: Apply suggested improvement
+  5. INFO: Consider patterns from src/components/BlogPost.tsx (similarity: 0.86)
+     Fix: Apply suggested improvement
+(sca) andres@mac:~/src/enric/sca$
+
+
+
+## AUGMENTED CODE
+
+(sca) andres@mac:~/src/enric/sca$ sca-analyze analyze a37f04b2927072795ca281ea30f7e91cd4f416cf --repo-path ~/src/enric/web-3
+Analyzing commit: a37f04b2927072795ca281ea30f7e91cd4f416cf
+📊 Using semantic embeddings for analysis (add --enable-regex-analyzers for multi-dimensional mode)
+🔍 Running pre-analysis hardware health check...
+✅ Hardware health check passed
+⚡ Using: Apple Silicon MPS (m3) (24.0GB memory)
+📊 Performance: MPS acceleration active on m3
+⠙ Domain analyzer: Model loading: Loading GraphCodeBERT model (this is the slow step)... 0:00:01Some weights of RobertaModel were not initialized from the model checkpoint at microsoft/graphcodebert-base and are newly initialized: ['pooler.dense.bias', 'pooler.dense.weight']
+You should probably TRAIN this model on a down-stream task to be able to use it for predictions and inference.
+⠧ Building pattern indices for domain-aware analysis... 0:06:24^R
+⠏ Analyzing with domain_adherence (12 files)... 0:08:092025-10-09 10:53:51,667 - semantic_code_analyzer.analyzers.domain_adherence_analyzer - WARNING - No pattern index found for domain database. Adherence analysis limited.
+⠇ Aggregating results... 0:08:10
+Analysis completed in 486.98s
+╭────────────────────────────────────────────────────────────────────────────────────────────── Analysis Results ──────────────────────────────────────────────────────────────────────────────────────────────╮
+│ Code-Focused Score: 0.841 (Overall: 0.827)                                                                                                                                                                   │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+             Dimensional Scores
+┏━━━━━━━━━━━━━━━━━━┳━━━━━━━┳━━━━━━━━━━━━━━━━┓
+┃ Dimension        ┃ Score ┃ Interpretation ┃
+┡━━━━━━━━━━━━━━━━━━╇━━━━━━━╇━━━━━━━━━━━━━━━━┩
+│ Domain_Adherence │ 0.827 │ Very Good      │
+└──────────────────┴───────┴────────────────┘
+
+
+                           Domain Breakdown
+┏━━━━━━━━━━┳━━━━━━━┳━━━━━━━━━━━┳━━━━━━━━━━━┳━━━━━━━━┳━━━━━━━━━━━━━━━━┓
+┃ Domain   ┃ Files ┃ Avg Score ┃     Range ┃ Weight ┃ Interpretation ┃
+┡━━━━━━━━━━╇━━━━━━━╇━━━━━━━━━━━╇━━━━━━━━━━━╇━━━━━━━━╇━━━━━━━━━━━━━━━━┩
+│ Backend  │     9 │     0.909 │ 0.87-0.95 │   🟢   │ Excellent      │
+│ Frontend │     2 │     0.873 │ 0.85-0.90 │   🟢   │ Very Good      │
+│ Database │     1 │     0.000 │ 0.00-0.00 │   🟢   │ Poor           │
+└──────────┴───────┴───────────┴───────────┴────────┴────────────────┘
+
+File Details by Domain:
+
+  [Backend] - Top 5/9 Files
+    1. 0.946 - src/app/api/github/repositories/route.ts
+    2. 0.942 - src/app/api/github/pull-requests/route.ts
+    3. 0.940 - src/app/api/github/branches/route.ts
+    4. 0.917 - src/lib/github/client.ts
+    5. 0.910 - src/lib/auth/jwt.ts
+
+  [Frontend] - Top 2/2 Files
+    1. 0.897 - src/components/admin/TaskDashboard.tsx
+    2. 0.849 - src/types/user.ts
+
+  [Database] - Top 1/1 Files
+    1. 0.000 - src/migrations/003_add_github_token_storage.sql
+
+Pattern Analysis:
+  Total patterns found: 45
+  Average confidence: 0.907
+  Patterns by type:
+    architectural: 45
+
+Top Issues by Domain:
+
+  [Database]
+    • src/migrations/003_add_github_token_storage.sql: Low adherence to database domain patterns (0.00)...
+(sca) andres@mac:~/src/enric/sca$
+
+
+
+##  CLAUDE CODE
+
+(sca) andres@mac:~/src/enric/sca$ sca-analyze analyze a6a1f5f8ae047be441c3155eeb41df8a61525900 --repo-path ~/src/enric/web-3
+Analyzing commit: a6a1f5f8ae047be441c3155eeb41df8a61525900
+📊 Using semantic embeddings for analysis (add --enable-regex-analyzers for multi-dimensional mode)
+🔍 Running pre-analysis hardware health check...
+✅ Hardware health check passed
+⚡ Using: Apple Silicon MPS (m3) (24.0GB memory)
+📊 Performance: MPS acceleration active on m3
+⠇ Domain analyzer: Model loading: Loading GraphCodeBERT model (this is the slow step)... 0:00:01Some weights of RobertaModel were not initialized from the model checkpoint at microsoft/graphcodebert-base and are newly initialized: ['pooler.dense.bias', 'pooler.dense.weight']
+You should probably TRAIN this model on a down-stream task to be able to use it for predictions and inference.
+⠴ Aggregating results... 0:07:49
+Analysis completed in 465.64s
+╭────────────────────────────────────────────────────────────────────────────────────────────── Analysis Results ──────────────────────────────────────────────────────────────────────────────────────────────╮
+│ Overall Adherence: 0.895                                                                                                                                                                                     │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+             Dimensional Scores
+┏━━━━━━━━━━━━━━━━━━┳━━━━━━━┳━━━━━━━━━━━━━━━━┓
+┃ Dimension        ┃ Score ┃ Interpretation ┃
+┡━━━━━━━━━━━━━━━━━━╇━━━━━━━╇━━━━━━━━━━━━━━━━┩
+│ Domain_Adherence │ 0.895 │ Very Good      │
+└──────────────────┴───────┴────────────────┘
+
+
+                           Domain Breakdown
+┏━━━━━━━━━━┳━━━━━━━┳━━━━━━━━━━━┳━━━━━━━━━━━┳━━━━━━━━┳━━━━━━━━━━━━━━━━┓
+┃ Domain   ┃ Files ┃ Avg Score ┃     Range ┃ Weight ┃ Interpretation ┃
+┡━━━━━━━━━━╇━━━━━━━╇━━━━━━━━━━━╇━━━━━━━━━━━╇━━━━━━━━╇━━━━━━━━━━━━━━━━┩
+│ Backend  │     6 │     0.912 │ 0.83-0.94 │   🟢   │ Excellent      │
+│ Frontend │     3 │     0.861 │ 0.83-0.89 │   🟢   │ Very Good      │
+└──────────┴───────┴───────────┴───────────┴────────┴────────────────┘
+
+File Details by Domain:
+
+  [Backend] - Top 5/6 Files
+    1. 0.942 - src/app/api/github/branches///route.ts
+    2. 0.942 - src/app/api/github/tasks/route.ts
+    3. 0.937 - src/app/api/github/pulls///route.ts
+    4. 0.915 - src/app/api/github/repos/route.ts
+    5. 0.903 - src/lib/github/service.ts
+
+  [Frontend] - Top 3/3 Files
+    1. 0.895 - src/components/admin/TaskDashboard.tsx
+    2. 0.860 - src/types/github.ts
+    3. 0.827 - src/types/user.ts
+
+Pattern Analysis:
+  Total patterns found: 36
+  Average confidence: 0.913
+  Patterns by type:
+    architectural: 36
+
+Top Issues by Domain:
+
+Top Recommendations:
+  1. INFO: Consider patterns from src/app/api/auth/me/route.ts (similarity: 0.96)
+     Fix: Apply suggested improvement
+  2. INFO: Consider patterns from src/app/api/github/repos/route.ts (similarity: 0.95)
+     Fix: Apply suggested improvement
+  3. INFO: Consider patterns from src/app/api/github/repos/route.ts (similarity: 0.93)
+     Fix: Apply suggested improvement
+  4. INFO: Consider patterns from src/app/api/auth/me/route.ts (similarity: 0.96)
+     Fix: Apply suggested improvement
+  5. INFO: Consider patterns from src/components/BookNowForm.tsx (similarity: 0.92)
+     Fix: Apply suggested improvement
+(sca) andres@mac:~/src/enric/sca$
+
+
+## CODEX
+
+
+(sca) andres@mac:~/src/enric/sca$ sca-analyze analyze b9cb6fd85a890faff4997aa494fa598791f06106 --repo-path ~/src/enric/web-3
+Analyzing commit: b9cb6fd85a890faff4997aa494fa598791f06106
+📊 Using semantic embeddings for analysis (add --enable-regex-analyzers for multi-dimensional mode)
+🔍 Running pre-analysis hardware health check...
+✅ Hardware health check passed
+⚡ Using: Apple Silicon MPS (m3) (24.0GB memory)
+📊 Performance: MPS acceleration active on m3
+⠹ Domain analyzer: Model loading: Loading GraphCodeBERT model (this is the slow step)... 0:00:01Some weights of RobertaModel were not initialized from the model checkpoint at microsoft/graphcodebert-base and are newly initialized: ['pooler.dense.bias', 'pooler.dense.weight']
+You should probably TRAIN this model on a down-stream task to be able to use it for predictions and inference.
+⠇ Domain analyzer: Model loading: Moving model to accelerated device... 0:00:03We strongly recommend passing in an `attention_mask` since your input_ids may be padded. See https://huggingface.co/docs/transformers/troubleshooting#incorrect-output-when-padding-tokens-arent-masked.
+⠙ Aggregating results... 0:09:34
+Analysis completed in 571.26s
+╭────────────────────────────────────────────────────────────────────────────────────────────── Analysis Results ──────────────────────────────────────────────────────────────────────────────────────────────╮
+│ Overall Adherence: 0.891                                                                                                                                                                                     │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+             Dimensional Scores
+┏━━━━━━━━━━━━━━━━━━┳━━━━━━━┳━━━━━━━━━━━━━━━━┓
+┃ Dimension        ┃ Score ┃ Interpretation ┃
+┡━━━━━━━━━━━━━━━━━━╇━━━━━━━╇━━━━━━━━━━━━━━━━┩
+│ Domain_Adherence │ 0.891 │ Very Good      │
+└──────────────────┴───────┴────────────────┘
+
+
+                           Domain Breakdown
+┏━━━━━━━━━━┳━━━━━━━┳━━━━━━━━━━━┳━━━━━━━━━━━┳━━━━━━━━┳━━━━━━━━━━━━━━━━┓
+┃ Domain   ┃ Files ┃ Avg Score ┃     Range ┃ Weight ┃ Interpretation ┃
+┡━━━━━━━━━━╇━━━━━━━╇━━━━━━━━━━━╇━━━━━━━━━━━╇━━━━━━━━╇━━━━━━━━━━━━━━━━┩
+│ Backend  │     2 │     0.890 │ 0.88-0.90 │   🟢   │ Very Good      │
+│ Frontend │     1 │     0.893 │ 0.89-0.89 │   🟢   │ Very Good      │
+└──────────┴───────┴───────────┴───────────┴────────┴────────────────┘
+
+File Details by Domain:
+
+  [Backend] - Top 2/2 Files
+    1. 0.903 - src/app/api/github/repos/route.ts
+    2. 0.877 - src/lib/github/dashboard.ts
+
+  [Frontend] - Top 1/1 Files
+    1. 0.893 - src/components/admin/TaskDashboard.tsx
+
+Pattern Analysis:
+  Total patterns found: 12
+  Average confidence: 0.908
+  Patterns by type:
+    architectural: 12
+
+Top Issues by Domain:
+
+Top Recommendations:
+  1. INFO: Consider patterns from src/app/api/auth/email/resend-verification/route.ts (similarity: 0.91)
+     Fix: Apply suggested improvement
+  2. INFO: Consider patterns from src/components/ui/TaskItem.tsx (similarity: 0.90)
+     Fix: Apply suggested improvement
+  3. INFO: Consider patterns from src/lib/logging.ts (similarity: 0.92)
+     Fix: Apply suggested improvement
+(sca) andres@mac:~/src/enric/sca$
+
+
+## ENRIC MAGE
+
+(sca) andres@mac:~/src/enric/sca$ sca-analyze analyze 2a79b59b88507dad9d5b6734b21409120275dd46 --repo-path ~/src/enric/web-3
+Analyzing commit: 2a79b59b88507dad9d5b6734b21409120275dd46
+📊 Using semantic embeddings for analysis (add --enable-regex-analyzers for multi-dimensional mode)
+🔍 Running pre-analysis hardware health check...
+✅ Hardware health check passed
+⚡ Using: Apple Silicon MPS (m3) (24.0GB memory)
+📊 Performance: MPS acceleration active on m3
+⠙ Domain analyzer: Model loading: Loading GraphCodeBERT model (this is the slow step)... 0:00:04Some weights of RobertaModel were not initialized from the model checkpoint at microsoft/graphcodebert-base and are newly initialized: ['pooler.dense.bias', 'pooler.dense.weight']
+You should probably TRAIN this model on a down-stream task to be able to use it for predictions and inference.
+⠴ Analyzing with domain_adherence (17 files)... 0:03:032025-10-10 14:13:47,560 - semantic_code_analyzer.analyzers.domain_adherence_analyzer - WARNING - No pattern index found for domain database. Adherence analysis limited.
+⠧ Aggregating results... 0:03:03
+Analysis completed in 178.33s
+╭────────────────────────────────────────────────────────────────────────────────────────────── Analysis Results ──────────────────────────────────────────────────────────────────────────────────────────────╮
+│ Overall Adherence: 0.835                                                                                                                                                                                     │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+             Dimensional Scores
+┏━━━━━━━━━━━━━━━━━━┳━━━━━━━┳━━━━━━━━━━━━━━━━┓
+┃ Dimension        ┃ Score ┃ Interpretation ┃
+┡━━━━━━━━━━━━━━━━━━╇━━━━━━━╇━━━━━━━━━━━━━━━━┩
+│ Domain_Adherence │ 0.835 │ Very Good      │
+└──────────────────┴───────┴────────────────┘
+
+
+                                 Domain Breakdown
+┏━━━━━━━━━━━━━━━┳━━━━━━━┳━━━━━━━━━━━┳━━━━━━━━━━━┳━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━┓
+┃ Domain        ┃ Files ┃ Avg Score ┃     Range ┃ Weight ┃ Interpretation         ┃
+┡━━━━━━━━━━━━━━━╇━━━━━━━╇━━━━━━━━━━━╇━━━━━━━━━━━╇━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━┩
+│ Backend       │    12 │     0.889 │ 0.82-0.95 │   🟢   │ Very Good              │
+│ Frontend      │     3 │     0.875 │ 0.85-0.90 │   🟢   │ Very Good              │
+│ Database      │     1 │     0.000 │ 0.00-0.00 │   🟢   │ Poor                   │
+│ Documentation │     1 │     0.899 │ 0.90-0.90 │   🔴   │ Very Good (low weight) │
+└───────────────┴───────┴───────────┴───────────┴────────┴────────────────────────┘
+
+File Details by Domain:
+
+  [Backend] - Top 12/12 Files
+    1. 0.949 - src/app/api/github/repos/list/route.ts
+    2. 0.941 - src/app/api/github/pulls/open/route.ts
+    3. 0.940 - src/app/api/github/branches/route.ts
+    4. 0.940 - src/app/api/github/pulls/closed/route.ts
+    5. 0.925 - src/lib/github/client.ts
+    6. 0.915 - src/lib/auth/jwt.ts
+    7. 0.869 - src/lib/user/repository.ts
+    8. 0.860 - src/app/api/auth/email/reset-password/route.ts
+    9. 0.842 - src/app/api/auth/email/login/route.ts
+    10. 0.842 - src/app/api/auth/google/route.ts
+    11. 0.828 - src/app/api/github/repos/route.ts
+    12. 0.818 - src/app/api/auth/github/callback/route.ts
+
+  [Frontend] - Top 3/3 Files
+    1. 0.902 - src/components/admin/TaskDashboard.tsx
+    2. 0.877 - src/types/github.ts
+    3. 0.846 - src/types/user.ts
+
+  [Database] - Top 1/1 Files
+    1. 0.000 - src/migrations/003_add_github_access_token.sql
+
+Pattern Analysis:
+  Total patterns found: 65
+  Average confidence: 0.901
+  Patterns by type:
+    architectural: 65
+
+Top Issues by Domain:
+
+  [Database]
+    • src/migrations/003_add_github_access_token.sql: Low adherence to database domain patterns (0.00)...
+
+
+## REFERENCE (FINE-TUNED)
+
+(sca) andres@mac:~/src/enric/sca$ sca-analyze analyze dbc9a233ca092c928d0c1dfd25a9881d97370a02 --repo-path ~/src/enric/web-2 --fine-tuned-model a97cfd9
+Analyzing commit: dbc9a233ca092c928d0c1dfd25a9881d97370a02
+📊 Using semantic embeddings for analysis (add --enable-regex-analyzers for multi-dimensional mode)
+🎯 Using fine-tuned model: a97cfd9
+🔍 Running pre-analysis hardware health check...
+✅ Hardware health check passed
+⚡ Using: Apple Silicon MPS (m3) (24.0GB memory)
+📊 Performance: MPS acceleration active on m3
+⠦ Aggregating results... 0:02:33
+Analysis completed in 152.75s
+╭────────────────────────────────────────────────────────────────────────────────────────────── Analysis Results ──────────────────────────────────────────────────────────────────────────────────────────────╮
+│ Overall Adherence: 0.928                                                                                                                                                                                     │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+             Dimensional Scores
+┏━━━━━━━━━━━━━━━━━━┳━━━━━━━┳━━━━━━━━━━━━━━━━┓
+┃ Dimension        ┃ Score ┃ Interpretation ┃
+┡━━━━━━━━━━━━━━━━━━╇━━━━━━━╇━━━━━━━━━━━━━━━━┩
+│ Domain_Adherence │ 0.928 │ Excellent      │
+└──────────────────┴───────┴────────────────┘
+
+
+                                 Domain Breakdown
+┏━━━━━━━━━━━━━━━┳━━━━━━━┳━━━━━━━━━━━┳━━━━━━━━━━━┳━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━┓
+┃ Domain        ┃ Files ┃ Avg Score ┃     Range ┃ Weight ┃ Interpretation         ┃
+┡━━━━━━━━━━━━━━━╇━━━━━━━╇━━━━━━━━━━━╇━━━━━━━━━━━╇━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━┩
+│ Frontend      │     6 │     0.933 │ 0.87-0.99 │   🟢   │ Excellent              │
+│ Configuration │     3 │     0.918 │ 0.89-0.94 │   🔴   │ Excellent (low weight) │
+│ Unknown       │     2 │     0.000 │ 0.00-0.00 │   🟡   │ Poor                   │
+└───────────────┴───────┴───────────┴───────────┴────────┴────────────────────────┘
+
+File Details by Domain:
+
+  [Frontend] - Top 5/6 Files
+    1. 0.988 - src/app//offer/enric/layout.tsx
+    2. 0.968 - src/styles/offer.css
+    3. 0.949 - src/app//offer/enric/page.tsx
+    4. 0.937 - src/components/TestimonialSectionFull.tsx
+    5. 0.884 - src/app//layout.tsx
+
+Pattern Analysis:
+  Total patterns found: 36
+  Average confidence: 0.939
+  Patterns by type:
+    architectural: 36
+
+Top Issues by Domain:
+
+Top Recommendations:
+  1. INFO: Consider patterns from messages/en.json (similarity: 0.94)
+     Fix: Apply suggested improvement
+  2. INFO: Consider patterns from messages/es.json (similarity: 0.94)
+     Fix: Apply suggested improvement
+  3. INFO: Consider patterns from src/app//layout.tsx (similarity: 0.90)
+     Fix: Apply suggested improvement
+  4. INFO: Consider patterns from src/app//solutions/brand-cloning/layout.tsx (similarity: 0.99)
+     Fix: Apply suggested improvement
+  5. INFO: Consider patterns from src/app//privacy-policy/page.tsx (similarity: 0.96)
+     Fix: Apply suggested improvement
+(sca) andres@mac:~/src/enric/sca$
+
+
+
+
+## DEVIN (FINE-TUNED)
+
+(sca) andres@mac:~/src/enric/sca$ sca-analyze analyze 8516107e683fa99455cb8f3bf8db48688f274368 --repo-path ~/src/enric/web-2 --fine-tuned-model a97cfd9
+Analyzing commit: 8516107e683fa99455cb8f3bf8db48688f274368
+📊 Using semantic embeddings for analysis (add --enable-regex-analyzers for multi-dimensional mode)
+🎯 Using fine-tuned model: a97cfd9
+🔍 Running pre-analysis hardware health check...
+✅ Hardware health check passed
+⚡ Using: Apple Silicon MPS (m3) (24.0GB memory)
+📊 Performance: MPS acceleration active on m3
+⠙ Aggregating results... 0:03:17
+Analysis completed in 197.11s
+╭────────────────────────────────────────────────────────────────────────────────────────────── Analysis Results ──────────────────────────────────────────────────────────────────────────────────────────────╮
+│ Overall Adherence: 0.908                                                                                                                                                                                     │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+             Dimensional Scores
+┏━━━━━━━━━━━━━━━━━━┳━━━━━━━┳━━━━━━━━━━━━━━━━┓
+┃ Dimension        ┃ Score ┃ Interpretation ┃
+┡━━━━━━━━━━━━━━━━━━╇━━━━━━━╇━━━━━━━━━━━━━━━━┩
+│ Domain_Adherence │ 0.908 │ Excellent      │
+└──────────────────┴───────┴────────────────┘
+
+
+                           Domain Breakdown
+┏━━━━━━━━━━┳━━━━━━━┳━━━━━━━━━━━┳━━━━━━━━━━━┳━━━━━━━━┳━━━━━━━━━━━━━━━━┓
+┃ Domain   ┃ Files ┃ Avg Score ┃     Range ┃ Weight ┃ Interpretation ┃
+┡━━━━━━━━━━╇━━━━━━━╇━━━━━━━━━━━╇━━━━━━━━━━━╇━━━━━━━━╇━━━━━━━━━━━━━━━━┩
+│ Backend  │     3 │     0.922 │ 0.92-0.93 │   🟢   │ Excellent      │
+│ Frontend │     2 │     0.887 │ 0.85-0.92 │   🟢   │ Very Good      │
+└──────────┴───────┴───────────┴───────────┴────────┴────────────────┘
+
+File Details by Domain:
+
+  [Backend] - Top 3/3 Files
+    1. 0.930 - src/app/api/github/user-repos/route.ts
+    2. 0.918 - src/app/api/github/repo-branches/route.ts
+    3. 0.918 - src/app/api/github/repo-pulls/route.ts
+
+  [Frontend] - Top 2/2 Files
+    1. 0.919 - src/components/admin/TaskDashboard.tsx
+    2. 0.854 - src/components/ui/TaskItem.tsx
+
+Pattern Analysis:
+  Total patterns found: 20
+  Average confidence: 0.916
+  Patterns by type:
+    architectural: 20
+
+Top Issues by Domain:
+
+Top Recommendations:
+  1. INFO: Consider patterns from src/app/api/dashboard/route.ts (similarity: 0.94)
+     Fix: Apply suggested improvement
+  2. INFO: Consider patterns from src/app/api/dashboard/route.ts (similarity: 0.94)
+     Fix: Apply suggested improvement
+  3. INFO: Consider patterns from src/app/api/dashboard/route.ts (similarity: 0.96)
+     Fix: Apply suggested improvement
+  4. INFO: Consider patterns from src/components/BookNowForm.tsx (similarity: 0.93)
+     Fix: Apply suggested improvement
+  5. INFO: Consider patterns from src/components/dashboard/CreateAgentSteps.tsx (similarity: 0.86)
+     Fix: Apply suggested improvement
+(sca) andres@mac:~/src/enric/sca$
+
+
+## AUGMENTED CODE (FINE-TUNED)
+
+(sca) andres@mac:~/src/enric/sca$ sca-analyze analyze a37f04b2927072795ca281ea30f7e91cd4f416cf --repo-path ~/src/enric/web-2 --fine-tuned-model a97cfd9
+Analyzing commit: a37f04b2927072795ca281ea30f7e91cd4f416cf
+📊 Using semantic embeddings for analysis (add --enable-regex-analyzers for multi-dimensional mode)
+🎯 Using fine-tuned model: a97cfd9
+🔍 Running pre-analysis hardware health check...
+✅ Hardware health check passed
+⚡ Using: Apple Silicon MPS (m3) (24.0GB memory)
+📊 Performance: MPS acceleration active on m3
+⠏ Analyzing with domain_adherence (12 files)... 0:03:312025-10-10 12:38:24,592 - semantic_code_analyzer.analyzers.domain_adherence_analyzer - WARNING - No pattern index found for domain database. Adherence analysis limited.
+⠹ Aggregating results... 0:03:32
+Analysis completed in 211.57s
+╭────────────────────────────────────────────────────────────────────────────────────────────── Analysis Results ──────────────────────────────────────────────────────────────────────────────────────────────╮
+│ Code-Focused Score: 0.840 (Overall: 0.826)                                                                                                                                                                   │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+             Dimensional Scores
+┏━━━━━━━━━━━━━━━━━━┳━━━━━━━┳━━━━━━━━━━━━━━━━┓
+┃ Dimension        ┃ Score ┃ Interpretation ┃
+┡━━━━━━━━━━━━━━━━━━╇━━━━━━━╇━━━━━━━━━━━━━━━━┩
+│ Domain_Adherence │ 0.826 │ Very Good      │
+└──────────────────┴───────┴────────────────┘
+
+
+                           Domain Breakdown
+┏━━━━━━━━━━┳━━━━━━━┳━━━━━━━━━━━┳━━━━━━━━━━━┳━━━━━━━━┳━━━━━━━━━━━━━━━━┓
+┃ Domain   ┃ Files ┃ Avg Score ┃     Range ┃ Weight ┃ Interpretation ┃
+┡━━━━━━━━━━╇━━━━━━━╇━━━━━━━━━━━╇━━━━━━━━━━━╇━━━━━━━━╇━━━━━━━━━━━━━━━━┩
+│ Backend  │     9 │     0.907 │ 0.87-0.95 │   🟢   │ Excellent      │
+│ Frontend │     2 │     0.873 │ 0.84-0.90 │   🟢   │ Very Good      │
+│ Database │     1 │     0.000 │ 0.00-0.00 │   🟢   │ Poor           │
+└──────────┴───────┴───────────┴───────────┴────────┴────────────────┘
+
+File Details by Domain:
+
+  [Backend] - Top 5/9 Files
+    1. 0.947 - src/app/api/github/repositories/route.ts
+    2. 0.943 - src/app/api/github/pull-requests/route.ts
+    3. 0.941 - src/app/api/github/branches/route.ts
+    4. 0.915 - src/lib/github/client.ts
+    5. 0.910 - src/lib/auth/jwt.ts
+
+  [Frontend] - Top 2/2 Files
+    1. 0.902 - src/components/admin/TaskDashboard.tsx
+    2. 0.845 - src/types/user.ts
+
+  [Database] - Top 1/1 Files
+    1. 0.000 - src/migrations/003_add_github_token_storage.sql
+
+Pattern Analysis:
+  Total patterns found: 45
+  Average confidence: 0.907
+  Patterns by type:
+    architectural: 45
+
+Top Issues by Domain:
+
+  [Database]
+    • src/migrations/003_add_github_token_storage.sql: Low adherence to database domain patterns (0.00)...
+(sca) andres@mac:~/src/enric/sca$
+
+
+## CLAUDE CODE (FINE-TUNED)
+
+(sca) andres@mac:~/src/enric/sca$ sca-analyze analyze a6a1f5f8ae047be441c3155eeb41df8a61525900 --repo-path ~/src/enric/web-2 --fine-tuned-model a97cfd9
+Analyzing commit: a6a1f5f8ae047be441c3155eeb41df8a61525900
+📊 Using semantic embeddings for analysis (add --enable-regex-analyzers for multi-dimensional mode)
+🎯 Using fine-tuned model: a97cfd9
+🔍 Running pre-analysis hardware health check...
+✅ Hardware health check passed
+⚡ Using: Apple Silicon MPS (m3) (24.0GB memory)
+📊 Performance: MPS acceleration active on m3
+⠼ Aggregating results... 0:03:37
+Analysis completed in 216.48s
+╭────────────────────────────────────────────────────────────────────────────────────────────── Analysis Results ──────────────────────────────────────────────────────────────────────────────────────────────╮
+│ Overall Adherence: 0.894                                                                                                                                                                                     │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+             Dimensional Scores
+┏━━━━━━━━━━━━━━━━━━┳━━━━━━━┳━━━━━━━━━━━━━━━━┓
+┃ Dimension        ┃ Score ┃ Interpretation ┃
+┡━━━━━━━━━━━━━━━━━━╇━━━━━━━╇━━━━━━━━━━━━━━━━┩
+│ Domain_Adherence │ 0.894 │ Very Good      │
+└──────────────────┴───────┴────────────────┘
+
+
+                           Domain Breakdown
+┏━━━━━━━━━━┳━━━━━━━┳━━━━━━━━━━━┳━━━━━━━━━━━┳━━━━━━━━┳━━━━━━━━━━━━━━━━┓
+┃ Domain   ┃ Files ┃ Avg Score ┃     Range ┃ Weight ┃ Interpretation ┃
+┡━━━━━━━━━━╇━━━━━━━╇━━━━━━━━━━━╇━━━━━━━━━━━╇━━━━━━━━╇━━━━━━━━━━━━━━━━┩
+│ Backend  │     6 │     0.911 │ 0.83-0.94 │   🟢   │ Excellent      │
+│ Frontend │     3 │     0.861 │ 0.82-0.90 │   🟢   │ Very Good      │
+└──────────┴───────┴───────────┴───────────┴────────┴────────────────┘
+
+File Details by Domain:
+
+  [Backend] - Top 5/6 Files
+    1. 0.942 - src/app/api/github/tasks/route.ts
+    2. 0.942 - src/app/api/github/branches///route.ts
+    3. 0.937 - src/app/api/github/pulls///route.ts
+    4. 0.914 - src/app/api/github/repos/route.ts
+    5. 0.902 - src/lib/github/service.ts
+
+  [Frontend] - Top 3/3 Files
+    1. 0.898 - src/components/admin/TaskDashboard.tsx
+    2. 0.864 - src/types/github.ts
+    3. 0.822 - src/types/user.ts
+
+Pattern Analysis:
+  Total patterns found: 36
+  Average confidence: 0.913
+  Patterns by type:
+    architectural: 36
+
+Top Issues by Domain:
+
+Top Recommendations:
+  1. INFO: Consider patterns from src/app/api/auth/me/route.ts (similarity: 0.96)
+     Fix: Apply suggested improvement
+  2. INFO: Consider patterns from src/app/api/github/repos/route.ts (similarity: 0.95)
+     Fix: Apply suggested improvement
+  3. INFO: Consider patterns from src/app/api/github/repos/route.ts (similarity: 0.93)
+     Fix: Apply suggested improvement
+  4. INFO: Consider patterns from src/app/api/auth/me/route.ts (similarity: 0.96)
+     Fix: Apply suggested improvement
+  5. INFO: Consider patterns from src/components/BookNowForm.tsx (similarity: 0.93)
+     Fix: Apply suggested improvement
+
+
+## CODEX (FINE-TUNED)
+
+
+(sca) andres@mac:~/src/enric/sca$ sca-analyze analyze b9cb6fd85a890faff4997aa494fa598791f06106 --repo-path ~/src/enric/web-2 --fine-tuned-model a97cfd9
+Analyzing commit: b9cb6fd85a890faff4997aa494fa598791f06106
+📊 Using semantic embeddings for analysis (add --enable-regex-analyzers for multi-dimensional mode)
+🎯 Using fine-tuned model: a97cfd9
+🔍 Running pre-analysis hardware health check...
+✅ Hardware health check passed
+⚡ Using: Apple Silicon MPS (m3) (24.0GB memory)
+📊 Performance: MPS acceleration active on m3
+⠙ Aggregating results... 0:03:11
+Analysis completed in 190.63s
+╭────────────────────────────────────────────────────────────────────────────────────────────── Analysis Results ──────────────────────────────────────────────────────────────────────────────────────────────╮
+│ Overall Adherence: 0.893                                                                                                                                                                                     │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+             Dimensional Scores
+┏━━━━━━━━━━━━━━━━━━┳━━━━━━━┳━━━━━━━━━━━━━━━━┓
+┃ Dimension        ┃ Score ┃ Interpretation ┃
+┡━━━━━━━━━━━━━━━━━━╇━━━━━━━╇━━━━━━━━━━━━━━━━┩
+│ Domain_Adherence │ 0.893 │ Very Good      │
+└──────────────────┴───────┴────────────────┘
+
+
+                           Domain Breakdown
+┏━━━━━━━━━━┳━━━━━━━┳━━━━━━━━━━━┳━━━━━━━━━━━┳━━━━━━━━┳━━━━━━━━━━━━━━━━┓
+┃ Domain   ┃ Files ┃ Avg Score ┃     Range ┃ Weight ┃ Interpretation ┃
+┡━━━━━━━━━━╇━━━━━━━╇━━━━━━━━━━━╇━━━━━━━━━━━╇━━━━━━━━╇━━━━━━━━━━━━━━━━┩
+│ Backend  │     2 │     0.888 │ 0.88-0.90 │   🟢   │ Very Good      │
+│ Frontend │     1 │     0.905 │ 0.90-0.90 │   🟢   │ Excellent      │
+└──────────┴───────┴───────────┴───────────┴────────┴────────────────┘
+
+File Details by Domain:
+
+  [Backend] - Top 2/2 Files
+    1. 0.899 - src/app/api/github/repos/route.ts
+    2. 0.876 - src/lib/github/dashboard.ts
+
+  [Frontend] - Top 1/1 Files
+    1. 0.905 - src/components/admin/TaskDashboard.tsx
+
+Pattern Analysis:
+  Total patterns found: 12
+  Average confidence: 0.909
+  Patterns by type:
+    architectural: 12
+
+Top Issues by Domain:
+
+Top Recommendations:
+  1. INFO: Consider patterns from src/app/api/auth/email/resend-verification/route.ts (similarity: 0.90)
+     Fix: Apply suggested improvement
+  2. INFO: Consider patterns from src/components/ui/TaskItem.tsx (similarity: 0.92)
+     Fix: Apply suggested improvement
+  3. INFO: Consider patterns from src/lib/logging.ts (similarity: 0.92)
+     Fix: Apply suggested improvement
+
+
+## ENRIC MAGE (FINE-TUNED)
+
+(sca) andres@mac:~/src/enric/sca$ sca-analyze analyze 2a79b59b88507dad9d5b6734b21409120275dd46 --repo-path ~/src/enric/web-3 --fine-tuned-model a97cfd9
+Analyzing commit: 2a79b59b88507dad9d5b6734b21409120275dd46
+📊 Using semantic embeddings for analysis (add --enable-regex-analyzers for multi-dimensional mode)
+🎯 Using fine-tuned model: a97cfd9
+🔍 Running pre-analysis hardware health check...
+✅ Hardware health check passed
+⚡ Using: Apple Silicon MPS (m3) (24.0GB memory)
+📊 Performance: MPS acceleration active on m3
+⠼ Analyzing with domain_adherence (17 files)... 0:02:512025-10-10 14:10:20,707 - semantic_code_analyzer.analyzers.domain_adherence_analyzer - WARNING - No pattern index found for domain database. Adherence analysis limited.
+⠦ Aggregating results... 0:02:51
+Analysis completed in 171.15s
+╭────────────────────────────────────────────────────────────────────────────────────────────── Analysis Results ──────────────────────────────────────────────────────────────────────────────────────────────╮
+│ Overall Adherence: 0.832                                                                                                                                                                                     │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+             Dimensional Scores
+┏━━━━━━━━━━━━━━━━━━┳━━━━━━━┳━━━━━━━━━━━━━━━━┓
+┃ Dimension        ┃ Score ┃ Interpretation ┃
+┡━━━━━━━━━━━━━━━━━━╇━━━━━━━╇━━━━━━━━━━━━━━━━┩
+│ Domain_Adherence │ 0.832 │ Very Good      │
+└──────────────────┴───────┴────────────────┘
+
+
+                                 Domain Breakdown
+┏━━━━━━━━━━━━━━━┳━━━━━━━┳━━━━━━━━━━━┳━━━━━━━━━━━┳━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━┓
+┃ Domain        ┃ Files ┃ Avg Score ┃     Range ┃ Weight ┃ Interpretation         ┃
+┡━━━━━━━━━━━━━━━╇━━━━━━━╇━━━━━━━━━━━╇━━━━━━━━━━━╇━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━┩
+│ Backend       │    12 │     0.885 │ 0.81-0.95 │   🟢   │ Very Good              │
+│ Frontend      │     3 │     0.875 │ 0.84-0.91 │   🟢   │ Very Good              │
+│ Database      │     1 │     0.000 │ 0.00-0.00 │   🟢   │ Poor                   │
+│ Documentation │     1 │     0.895 │ 0.89-0.89 │   🔴   │ Very Good (low weight) │
+└───────────────┴───────┴───────────┴───────────┴────────┴────────────────────────┘
+
+File Details by Domain:
+
+  [Backend] - Top 12/12 Files
+    1. 0.950 - src/app/api/github/repos/list/route.ts
+    2. 0.943 - src/app/api/github/pulls/open/route.ts
+    3. 0.942 - src/app/api/github/pulls/closed/route.ts
+    4. 0.942 - src/app/api/github/branches/route.ts
+    5. 0.923 - src/lib/github/client.ts
+    6. 0.911 - src/lib/auth/jwt.ts
+    7. 0.863 - src/lib/user/repository.ts
+    8. 0.850 - src/app/api/auth/email/reset-password/route.ts
+    9. 0.834 - src/app/api/auth/email/login/route.ts
+    10. 0.834 - src/app/api/auth/google/route.ts
+    11. 0.820 - src/app/api/github/repos/route.ts
+    12. 0.810 - src/app/api/auth/github/callback/route.ts
+
+  [Frontend] - Top 3/3 Files
+    1. 0.907 - src/components/admin/TaskDashboard.tsx
+    2. 0.875 - src/types/github.ts
+    3. 0.842 - src/types/user.ts
+
+  [Database] - Top 1/1 Files
+    1. 0.000 - src/migrations/003_add_github_access_token.sql
+
+Pattern Analysis:
+  Total patterns found: 65
+  Average confidence: 0.898
+  Patterns by type:
+    architectural: 65
+
+Top Issues by Domain:
+
+  [Database]
+    • src/migrations/003_add_github_access_token.sql: Low adherence to database domain patterns (0.00)...

@@ -28,17 +28,6 @@ similarity search for identifying similar code patterns within domain contexts.
 
 from __future__ import annotations
 
-from .code_feature_extractor import (
-    compare_features,
-    extract_code_features,
-    generate_feature_insights,
-)
 from .pattern_indexer import PatternIndexer, SimilarityMatch
 
-__all__ = [
-    "PatternIndexer",
-    "SimilarityMatch",
-    "extract_code_features",
-    "compare_features",
-    "generate_feature_insights",
-]
+__all__ = ["PatternIndexer", "SimilarityMatch"]
