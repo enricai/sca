@@ -84,8 +84,8 @@ class TestHardwareAcceleratedPatternIndexer(unittest.TestCase):
         """Clean up temporary files."""
         shutil.rmtree(self.temp_dir, ignore_errors=True)
 
-    @patch("semantic_code_analyzer.embeddings.pattern_indexer.RobertaTokenizer")
-    @patch("semantic_code_analyzer.embeddings.pattern_indexer.RobertaModel")
+    @patch("semantic_code_analyzer.embeddings.pattern_indexer.AutoTokenizer")
+    @patch("semantic_code_analyzer.embeddings.pattern_indexer.AutoModel")
     @patch("torch.cuda.is_available")
     def test_pattern_indexer_m3_initialization(
         self, mock_cuda: MagicMock, mock_model: MagicMock, mock_tokenizer: MagicMock
@@ -153,8 +153,8 @@ class TestHardwareAcceleratedPatternIndexer(unittest.TestCase):
         # The to() method should be called at least twice: once for device, once for dtype
         self.assertGreaterEqual(mock_model_instance.to.call_count, 2)
 
-    @patch("semantic_code_analyzer.embeddings.pattern_indexer.RobertaTokenizer")
-    @patch("semantic_code_analyzer.embeddings.pattern_indexer.RobertaModel")
+    @patch("semantic_code_analyzer.embeddings.pattern_indexer.AutoTokenizer")
+    @patch("semantic_code_analyzer.embeddings.pattern_indexer.AutoModel")
     @patch("torch.cuda.is_available")
     def test_hardware_optimization_application(
         self, mock_cuda: MagicMock, mock_model: MagicMock, mock_tokenizer: MagicMock
@@ -202,8 +202,8 @@ class TestHardwareAcceleratedPatternIndexer(unittest.TestCase):
         # Verify that MPS optimizations were applied
         self.assertTrue(pattern_indexer.enable_optimizations)
 
-    @patch("semantic_code_analyzer.embeddings.pattern_indexer.RobertaTokenizer")
-    @patch("semantic_code_analyzer.embeddings.pattern_indexer.RobertaModel")
+    @patch("semantic_code_analyzer.embeddings.pattern_indexer.AutoTokenizer")
+    @patch("semantic_code_analyzer.embeddings.pattern_indexer.AutoModel")
     @patch("torch.cuda.is_available")
     def test_embedding_extraction_with_mixed_precision(
         self, mock_cuda: MagicMock, mock_model: MagicMock, mock_tokenizer: MagicMock
@@ -233,7 +233,7 @@ class TestHardwareAcceleratedPatternIndexer(unittest.TestCase):
         # Mock model output
         mock_output = MagicMock()
         mock_output.last_hidden_state = torch.randn(
-            1, 3, 768
+            1, 3, 1536
         )  # [batch, seq_len, hidden]
         mock_model_instance.return_value = mock_output
 
@@ -272,7 +272,7 @@ class TestHardwareAcceleratedPatternIndexer(unittest.TestCase):
         mock_autocast.assert_called_once_with(device_type="mps", dtype=torch.float16)
 
         # Verify embedding shape
-        self.assertEqual(embedding.shape, (768,))  # GraphCodeBERT embedding size
+        self.assertEqual(embedding.shape, (1536,))  # Qodo-Embed embedding size
 
     def test_performance_metrics_tracking(self) -> None:
         """Test performance metrics collection."""
@@ -293,8 +293,8 @@ class TestHardwareAcceleratedPatternIndexer(unittest.TestCase):
         }
 
         with (
-            patch("semantic_code_analyzer.embeddings.pattern_indexer.RobertaTokenizer"),
-            patch("semantic_code_analyzer.embeddings.pattern_indexer.RobertaModel"),
+            patch("semantic_code_analyzer.embeddings.pattern_indexer.AutoTokenizer"),
+            patch("semantic_code_analyzer.embeddings.pattern_indexer.AutoModel"),
         ):
             pattern_indexer = PatternIndexer(
                 cache_dir=str(self.temp_path), device_manager=mock_device_manager
@@ -314,8 +314,8 @@ class TestHardwareAcceleratedPatternIndexer(unittest.TestCase):
         self.assertEqual(device_info["chip_generation"], "m3")
         self.assertTrue(device_info["is_apple_silicon"])
 
-    @patch("semantic_code_analyzer.embeddings.pattern_indexer.RobertaTokenizer")
-    @patch("semantic_code_analyzer.embeddings.pattern_indexer.RobertaModel")
+    @patch("semantic_code_analyzer.embeddings.pattern_indexer.AutoTokenizer")
+    @patch("semantic_code_analyzer.embeddings.pattern_indexer.AutoModel")
     def test_fallback_mechanism(
         self, mock_model: MagicMock, mock_tokenizer: MagicMock
     ) -> None:
@@ -371,12 +371,12 @@ class TestHardwareAcceleratedPatternIndexer(unittest.TestCase):
         }
 
         with (
-            patch("semantic_code_analyzer.embeddings.pattern_indexer.RobertaTokenizer"),
-            patch("semantic_code_analyzer.embeddings.pattern_indexer.RobertaModel"),
+            patch("semantic_code_analyzer.embeddings.pattern_indexer.AutoTokenizer"),
+            patch("semantic_code_analyzer.embeddings.pattern_indexer.AutoModel"),
             patch.object(PatternIndexer, "_extract_code_embeddings") as mock_extract,
         ):
             # Mock embedding extraction
-            mock_extract.return_value = np.random.randn(768)
+            mock_extract.return_value = np.random.randn(1536)
 
             pattern_indexer = PatternIndexer(
                 cache_dir=str(self.temp_path), device_manager=mock_device_manager
@@ -394,8 +394,8 @@ class TestHardwareAcceleratedPatternIndexer(unittest.TestCase):
             # Verify embeddings were extracted
             self.assertEqual(mock_extract.call_count, 2)
 
-    @patch("semantic_code_analyzer.embeddings.pattern_indexer.RobertaTokenizer")
-    @patch("semantic_code_analyzer.embeddings.pattern_indexer.RobertaModel")
+    @patch("semantic_code_analyzer.embeddings.pattern_indexer.AutoTokenizer")
+    @patch("semantic_code_analyzer.embeddings.pattern_indexer.AutoModel")
     def test_benchmark_functionality(
         self, mock_model: MagicMock, mock_tokenizer: MagicMock
     ) -> None:
@@ -439,7 +439,7 @@ class TestHardwareAcceleratedPatternIndexer(unittest.TestCase):
             patch.object(pattern_indexer, "_extract_code_embeddings") as mock_extract,
             patch("torch.mps.synchronize"),
         ):
-            mock_extract.return_value = np.random.randn(768)
+            mock_extract.return_value = np.random.randn(1536)
 
             results = pattern_indexer.benchmark_embedding_performance(
                 test_code="def test(): pass", iterations=5
@@ -465,8 +465,8 @@ class TestCPUFallback(unittest.TestCase):
         """Clean up temporary files."""
         shutil.rmtree(self.temp_dir, ignore_errors=True)
 
-    @patch("semantic_code_analyzer.embeddings.pattern_indexer.RobertaTokenizer")
-    @patch("semantic_code_analyzer.embeddings.pattern_indexer.RobertaModel")
+    @patch("semantic_code_analyzer.embeddings.pattern_indexer.AutoTokenizer")
+    @patch("semantic_code_analyzer.embeddings.pattern_indexer.AutoModel")
     def test_cpu_device_configuration(
         self, mock_model: MagicMock, mock_tokenizer: MagicMock
     ) -> None:

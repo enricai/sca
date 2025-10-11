@@ -23,7 +23,7 @@
 """Domain-aware adherence analyzer for AI-generated code quality measurement.
 
 This analyzer measures how well AI-generated code changes adhere to existing
-repository patterns within specific architectural domains using GraphCodeBERT
+repository patterns within specific architectural domains using code
 embeddings and similarity-based pattern matching.
 """
 
@@ -143,14 +143,14 @@ class DomainAwareAdherenceAnalyzer(BaseAnalyzer):
             fine_tuned_commit = config.get("fine_tuned_model_commit")
             if fine_tuned_commit:
                 report_progress(
-                    f"Loading fine-tuned GraphCodeBERT model for commit {fine_tuned_commit[:7]}..."
+                    f"Loading fine-tuned code embedding model for commit {fine_tuned_commit[:7]}..."
                 )
             else:
                 report_progress(
-                    "Loading GraphCodeBERT model (this may take a while)..."
+                    "Loading code embedding model (this may take a while)..."
                 )
 
-            model_name = config.get("model_name", "microsoft/graphcodebert-base")
+            model_name = config.get("model_name", "Qodo/Qodo-Embed-1-1.5B")
             cache_dir = config.get("cache_dir")
 
             def pattern_indexer_progress_callback(message: str) -> None:

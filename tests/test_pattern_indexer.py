@@ -47,10 +47,10 @@ class TestPatternIndexer:
         """Mock the transformer model components to avoid loading actual models."""
         with (
             patch(
-                "semantic_code_analyzer.embeddings.pattern_indexer.RobertaTokenizer"
+                "semantic_code_analyzer.embeddings.pattern_indexer.AutoTokenizer"
             ) as mock_tokenizer,
             patch(
-                "semantic_code_analyzer.embeddings.pattern_indexer.RobertaModel"
+                "semantic_code_analyzer.embeddings.pattern_indexer.AutoModel"
             ) as mock_model,
             patch(
                 "semantic_code_analyzer.embeddings.pattern_indexer.torch"
@@ -75,8 +75,8 @@ class TestPatternIndexer:
 
             # Create mock tensor with shape [batch_size, seq_len, hidden_size]
             mock_tensor = Mock()
-            mock_tensor.shape = [1, 512, 768]
-            mock_tensor.cpu.return_value.numpy.return_value = np.random.randn(768)
+            mock_tensor.shape = [1, 512, 1536]
+            mock_tensor.cpu.return_value.numpy.return_value = np.random.randn(1536)
             mock_outputs.last_hidden_state.__getitem__.return_value = mock_tensor
 
             mock_model_instance.return_value = mock_outputs
@@ -168,7 +168,7 @@ export function capitalizeFirst(str: string): string {
         with tempfile.TemporaryDirectory() as temp_dir:
             indexer = PatternIndexer(cache_dir=temp_dir)
 
-            assert indexer.model_name == "microsoft/graphcodebert-base"
+            assert indexer.model_name == "Qodo/Qodo-Embed-1-1.5B"
             assert indexer.cache_dir == Path(temp_dir)
             assert len(indexer.domain_indices) == 0
             assert len(indexer.embedding_cache) == 0
@@ -179,11 +179,11 @@ export function capitalizeFirst(str: string): string {
         embedding = indexer._extract_code_embeddings(code)
 
         assert isinstance(embedding, np.ndarray)
-        assert embedding.shape == (768,)  # GraphCodeBERT embedding dimension
+        assert embedding.shape == (1536,)  # Qodo-Embed embedding dimension
 
     def test_normalize_embeddings(self, indexer: PatternIndexer) -> None:
         """Test embedding normalization."""
-        embeddings = np.random.randn(5, 768)
+        embeddings = np.random.randn(5, 1536)
         normalized = indexer._normalize_embeddings(embeddings)
 
         assert normalized.shape == embeddings.shape
@@ -346,7 +346,7 @@ export default TestComponent;
     def test_clear_cache(self, indexer: PatternIndexer) -> None:
         """Test clearing embedding cache."""
         # Add something to cache
-        indexer.embedding_cache["test"] = np.random.randn(768)
+        indexer.embedding_cache["test"] = np.random.randn(1536)
         assert len(indexer.embedding_cache) > 0
 
         # Clear cache
@@ -413,7 +413,7 @@ export default TestComponent;
             try:
                 embedding = indexer._extract_code_embeddings(code)
                 assert isinstance(embedding, np.ndarray)
-                assert embedding.shape == (768,)
+                assert embedding.shape == (1536,)
             except Exception as e:
                 # Should handle errors gracefully and return zero vector
                 # Log the exception to verify error handling is working
@@ -430,7 +430,7 @@ export default TestComponent;
 
         # Create mock components
         mock_index = Mock()
-        mock_embeddings = np.random.randn(5, 768)
+        mock_embeddings = np.random.randn(5, 1536)
 
         pattern_index = PatternIndex(
             domain="test",
@@ -445,5 +445,5 @@ export default TestComponent;
         assert pattern_index.index == mock_index
         assert len(pattern_index.file_paths) == 2
         assert len(pattern_index.code_snippets) == 2
-        assert pattern_index.embeddings.shape == (5, 768)
+        assert pattern_index.embeddings.shape == (5, 1536)
         assert pattern_index.metadata["test"] is True

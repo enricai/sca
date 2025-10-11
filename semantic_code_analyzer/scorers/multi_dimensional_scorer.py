@@ -93,7 +93,7 @@ class EnhancedScorerConfig:
     domain_confidence_threshold: float = 0.6
     max_similar_patterns: int = 10
     build_pattern_indices: bool = True
-    model_name: str = "microsoft/graphcodebert-base"
+    model_name: str = "Qodo/Qodo-Embed-1-1.5B"
     cache_dir: str | None = None
     fine_tuned_model_commit: str | None = None  # Commit hash of fine-tuned model to use
 

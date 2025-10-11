@@ -23,7 +23,7 @@
 """Automatic pair generation for contrastive learning.
 
 This module generates positive and negative code pairs for training
-RobertaModel with contrastive learning objectives.
+code embedding models with contrastive learning objectives.
 """
 
 from __future__ import annotations

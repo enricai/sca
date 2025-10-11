@@ -23,7 +23,7 @@
 """Data preparation for masked language modeling (MLM) fine-tuning.
 
 This module handles extracting code from git commits and preparing it for
-GraphCodeBERT fine-tuning using masked language modeling.
+code embedding model fine-tuning using masked language modeling.
 """
 
 from __future__ import annotations
@@ -36,7 +36,6 @@ from typing import Any
 import git
 import torch
 from torch.utils.data import Dataset
-from transformers import RobertaTokenizer
 
 from ..analyzers.domain_classifier import DomainClassifier
 
@@ -63,7 +62,7 @@ class CodeDatasetPreparator:
     def __init__(
         self,
         repo_path: str,
-        tokenizer: RobertaTokenizer,
+        tokenizer: Any,
         max_files: int = 1000,
         include_test_files: bool = False,
         include_generated_files: bool = False,
@@ -72,7 +71,7 @@ class CodeDatasetPreparator:
 
         Args:
             repo_path: Path to git repository
-            tokenizer: RobertaTokenizer for tokenization
+            tokenizer: Tokenizer instance (AutoTokenizer)
             max_files: Maximum number of files to extract
             include_test_files: Whether to include test files
             include_generated_files: Whether to include generated files
@@ -270,13 +269,13 @@ class MLMDataset(Dataset[dict[str, Any]]):
     """PyTorch Dataset for masked language modeling on code.
 
     This dataset handles tokenization and masking of code samples for
-    training GraphCodeBERT using MLM objective.
+    training code embedding models using MLM objective.
     """
 
     def __init__(
         self,
         code_samples: list[CodeSample],
-        tokenizer: RobertaTokenizer,
+        tokenizer: Any,
         max_length: int = 512,
         mlm_probability: float = 0.15,
     ):
@@ -284,7 +283,7 @@ class MLMDataset(Dataset[dict[str, Any]]):
 
         Args:
             code_samples: List of code samples
-            tokenizer: RobertaTokenizer for tokenization
+            tokenizer: Tokenizer instance (AutoTokenizer)
             max_length: Maximum sequence length
             mlm_probability: Probability of masking tokens
         """

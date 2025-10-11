@@ -242,7 +242,7 @@ def cli(ctx: click.Context, verbose: bool) -> None:
 )
 @click.option(
     "--fine-tuned-model",
-    help="Use a fine-tuned GraphCodeBERT model from a specific commit (specify commit hash or model name)",
+    help="Use a fine-tuned code embedding model from a specific commit (specify commit hash or model name)",
 )
 @click.pass_context
 def analyze(
@@ -1050,9 +1050,9 @@ def fine_tune(
     device: str,
     output_name: str | None,
 ) -> None:
-    """Fine-tune GraphCodeBERT on a specific commit to learn code style patterns.
+    """Fine-tune code embedding model on a specific commit to learn code style patterns.
 
-    This command trains a specialized version of GraphCodeBERT on your codebase
+    This command trains a specialized version of the code embedding model on your codebase
     at the specified commit. The fine-tuned model learns your code style, naming
     conventions, and patterns, which improves Domain Adherence scores when analyzing
     similar code.
@@ -1061,7 +1061,7 @@ def fine_tune(
         sca-analyze fine-tune dbc9a23 --repo-path ~/src/enric/web
     """
     console.print(
-        f"[bold blue]Fine-tuning GraphCodeBERT on commit: {commit_hash}[/bold blue]"
+        f"[bold blue]Fine-tuning code embedding model on commit: {commit_hash}[/bold blue]"
     )
 
     logger.info("=== STARTING FINE-TUNING ===")
@@ -1491,7 +1491,7 @@ Divergence: {divergence_score:.3f} ({div_level})"""
     console.print("\n[bold]Interpretation:[/bold]")
     console.print(
         "[dim]The divergence score and dimension differences show which parts of the "
-        "768-dimensional embedding space differ most from reference patterns.[/dim]"
+        "1536-dimensional embedding space differ most from reference patterns.[/dim]"
     )
     console.print(
         "[dim]Higher divergence = more semantically different from established code patterns.[/dim]"

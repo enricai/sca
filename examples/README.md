@@ -113,7 +113,7 @@ from semantic_code_analyzer.training import (
 
 # Configure fine-tuning
 config = FineTuningConfig(
-    model_name="microsoft/graphcodebert-base",
+    model_name="Qodo/Qodo-Embed-1-1.5B",
     epochs=3,
     batch_size=8,
     learning_rate=5e-5,
@@ -215,7 +215,7 @@ sca-analyze analyze abc123def456 \
 ### Fine-Tuning (CLI)
 
 ```bash
-# Fine-tune GraphCodeBERT on your codebase
+# Fine-tune code embedding model on your codebase
 sca-analyze fine-tune HEAD --repo-path . --epochs 3 --batch-size 8
 
 # Fine-tune with custom settings

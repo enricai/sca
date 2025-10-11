@@ -156,8 +156,8 @@ export default NewButton;
     def mock_models(self) -> Any:
         """Mock the ML models to avoid loading actual models."""
         with (
-            patch("semantic_code_analyzer.embeddings.pattern_indexer.RobertaTokenizer"),
-            patch("semantic_code_analyzer.embeddings.pattern_indexer.RobertaModel"),
+            patch("semantic_code_analyzer.embeddings.pattern_indexer.AutoTokenizer"),
+            patch("semantic_code_analyzer.embeddings.pattern_indexer.AutoModel"),
             patch(
                 "semantic_code_analyzer.embeddings.pattern_indexer.torch"
             ) as mock_torch,

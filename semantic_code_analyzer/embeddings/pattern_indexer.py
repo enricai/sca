@@ -20,7 +20,7 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
-"""Pattern indexing system using GraphCodeBERT embeddings and FAISS similarity search.
+"""Pattern indexing system using code embeddings and FAISS similarity search.
 
 This module provides functionality to build domain-specific code pattern indices
 using state-of-the-art code embeddings for fast similarity search and pattern
@@ -44,7 +44,7 @@ from typing import Any, TypeVar
 import faiss  # type: ignore[import-untyped]
 import numpy as np
 import torch
-from transformers import RobertaModel, RobertaTokenizer
+from transformers import AutoModel, AutoTokenizer
 
 from ..hardware.device_manager import DeviceManager, DeviceType
 from ..hardware.exceptions import FallbackError, ModelLoadingError
@@ -89,10 +89,10 @@ class PatternIndex:
 
 
 class PatternIndexer:
-    """Build and manage domain-specific FAISS similarity indices using GraphCodeBERT embeddings.
+    """Build and manage domain-specific FAISS similarity indices using code embeddings.
 
     This class provides functionality to:
-    - Extract code embeddings using GraphCodeBERT
+    - Extract code embeddings using Qodo-Embed
     - Build FAISS indices for fast similarity search
     - Search for similar patterns within domain contexts
     - Cache embeddings for performance optimization
@@ -100,7 +100,7 @@ class PatternIndexer:
 
     def __init__(
         self,
-        model_name: str = "microsoft/graphcodebert-base",
+        model_name: str = "Qodo/Qodo-Embed-1-1.5B",
         model_revision: str = "main",  # pragma: allowlist secret
         cache_dir: str | None = None,
         device_manager: DeviceManager | None = None,
@@ -108,10 +108,10 @@ class PatternIndexer:
         progress_callback: Callable[[str], None] | None = None,
         fine_tuned_model_commit: str | None = None,
     ):
-        """Initialize the PatternIndexer with GraphCodeBERT model.
+        """Initialize the PatternIndexer with Qodo-Embed model.
 
         Args:
-            model_name: Name of the GraphCodeBERT model to use
+            model_name: Name of the code embedding model to use
             model_revision: Model revision/commit hash for reproducible downloads (security)
             cache_dir: Directory for caching models and indices
             device_manager: Device manager for hardware acceleration (auto-created if None)
@@ -210,7 +210,7 @@ class PatternIndexer:
         hardware_info = self.device_manager.hardware_info
         logger.info("=== MODEL LOADING START ===")
         logger.info(
-            f"Loading GraphCodeBERT model: {model_name} on {hardware_info.device_name}"
+            f"Loading code embedding model: {model_name} on {hardware_info.device_name}"
         )
         logger.info(f"Target device type: {hardware_info.device_type}")
         logger.info(f"Available memory: {hardware_info.memory_gb:.1f}GB")
@@ -236,14 +236,14 @@ class PatternIndexer:
 
                 # Load tokenizer from fine-tuned model directory
                 # Loading from local trusted fine-tuned directory, not remote Hub
-                self.tokenizer = RobertaTokenizer.from_pretrained(
+                self.tokenizer = AutoTokenizer.from_pretrained(
                     fine_tuned_path
                 )  # nosec B615
                 logger.info("Tokenizer loaded from fine-tuned model")
 
                 # Load fine-tuned model
                 # Loading from local trusted fine-tuned directory, not remote Hub
-                self.model = RobertaModel.from_pretrained(
+                self.model = AutoModel.from_pretrained(
                     fine_tuned_path,
                     low_cpu_mem_usage=self.optimization_settings["low_cpu_mem_usage"],
                 )  # nosec B615
@@ -261,16 +261,16 @@ class PatternIndexer:
                                 f"fine-tuned-{fine_tuned_model_commit[:7]}"
                             )
             else:
-                # Load base GraphCodeBERT model (original behavior)
+                # Load base code embedding model (original behavior)
                 # Load tokenizer with retry mechanism
-                report_progress("Loading GraphCodeBERT tokenizer...")
+                report_progress("Loading model tokenizer...")
                 logger.info("=== TOKENIZER LOADING ===")
-                logger.info("Loading RobertaTokenizer...")
+                logger.info("Loading AutoTokenizer...")
                 logger.info(f"Tokenizer model: {model_name}")
                 logger.info(f"Tokenizer cache dir: {str(self.cache_dir)}")
 
                 self.tokenizer = self._load_with_retry(
-                    lambda: RobertaTokenizer.from_pretrained(
+                    lambda: AutoTokenizer.from_pretrained(
                         model_name,
                         revision=self.model_revision,
                         cache_dir=str(self.cache_dir),  # nosec B615
@@ -280,13 +280,11 @@ class PatternIndexer:
                 logger.info("Tokenizer loaded successfully!")
 
                 # Load model with hardware-specific optimizations and retry mechanism
-                report_progress(
-                    "Loading GraphCodeBERT model (this is the slow step)..."
-                )
+                report_progress("Loading embedding model (this is the slow step)...")
                 logger.info("=== MODEL LOADING ===")
                 logger.info("Preparing model loading parameters...")
 
-                # Note: RobertaModel.from_pretrained() doesn't support dtype parameter directly
+                # Note: AutoModel.from_pretrained() doesn't support dtype parameter directly
                 # The dtype should be applied after loading
                 model_kwargs = {
                     "cache_dir": str(self.cache_dir),
@@ -300,18 +298,16 @@ class PatternIndexer:
                     f"Target dtype (to be applied after loading): {self.optimization_settings['dtype']}"
                 )
 
-                logger.info(
-                    "Loading RobertaModel - THIS IS WHERE SEGFAULTS OFTEN OCCUR!"
-                )
-                logger.info("About to call RobertaModel.from_pretrained()...")
+                logger.info("Loading AutoModel - THIS IS WHERE SEGFAULTS OFTEN OCCUR!")
+                logger.info("About to call AutoModel.from_pretrained()...")
 
                 self.model = self._load_with_retry(
-                    lambda: RobertaModel.from_pretrained(
+                    lambda: AutoModel.from_pretrained(
                         model_name, revision=self.model_revision, **model_kwargs
                     ),  # nosec B615
                     "model",
                 )
-                logger.info("RobertaModel loaded successfully!")
+                logger.info("AutoModel loaded successfully!")
 
             report_progress("Configuring model settings...")
             logger.info("Setting model to evaluation mode...")
@@ -401,7 +397,7 @@ class PatternIndexer:
             logger.info("=== MODEL LOADING COMPLETE ===")
         except Exception as e:
             model_error = ModelLoadingError(
-                f"Failed to load GraphCodeBERT model on {hardware_info.device_name}: {e}",
+                f"Failed to load code embedding model on {hardware_info.device_name}: {e}",
                 device_type=hardware_info.device_type.value,
                 model_name=self.model_name,
             )
@@ -419,7 +415,7 @@ class PatternIndexer:
                 except Exception as fallback_error:
                     logger.error(f"CPU fallback also failed: {fallback_error}")
                     raise FallbackError(
-                        f"Could not initialize GraphCodeBERT model on any device: {e}",
+                        f"Could not initialize code embedding model on any device: {e}",
                         original_error=model_error,
                         fallback_device="cpu",
                     ) from model_error
@@ -676,7 +672,7 @@ class PatternIndexer:
             "low_cpu_mem_usage": True,
         }
 
-        self.model = RobertaModel.from_pretrained(
+        self.model = AutoModel.from_pretrained(
             self.model_name, revision=self.model_revision, **model_kwargs
         )  # nosec B615
         self.model.eval()
@@ -1170,16 +1166,46 @@ class PatternIndexer:
             "metadata": pattern_index.metadata,
         }
 
+    def _last_token_pool(
+        self,
+        last_hidden_state: torch.Tensor,
+        attention_mask: torch.Tensor,
+    ) -> torch.Tensor:
+        """Pool embeddings using last token strategy (for Qodo-Embed).
+
+        Args:
+            last_hidden_state: Model output hidden states [batch_size, seq_len, hidden_dim]
+            attention_mask: Attention mask [batch_size, seq_len]
+
+        Returns:
+            Pooled embeddings [batch_size, hidden_dim]
+        """
+        # Get the position of the last non-padding token for each sequence
+        # attention_mask is 1 for real tokens, 0 for padding
+        left_padding = attention_mask[:, -1].sum() == attention_mask.shape[0]
+
+        if left_padding:
+            # Left padding: last real token is at position sum(attention_mask) - 1
+            return last_hidden_state[:, -1, :]
+        else:
+            # Right padding: find last non-padding token per sequence
+            sequence_lengths = attention_mask.sum(dim=1) - 1
+            batch_size = last_hidden_state.shape[0]
+            return last_hidden_state[
+                torch.arange(batch_size, device=last_hidden_state.device),
+                sequence_lengths,
+            ]
+
     def _extract_code_embeddings(
         self, code_content: str
     ) -> np.ndarray[Any, np.dtype[np.floating[Any]]]:
-        """Extract GraphCodeBERT embeddings for code content with hardware optimization.
+        """Extract code embeddings for code content with hardware optimization.
 
         Args:
             code_content: Source code content
 
         Returns:
-            Normalized embedding vector
+            Embedding vector
         """
         import time
 
@@ -1220,10 +1246,11 @@ class PatternIndexer:
             with autocast_context:
                 try:
                     outputs = self.model(**tokens)
-                    # Use the [CLS] token embedding as the code representation
-                    embeddings = (
-                        outputs.last_hidden_state[:, 0, :].detach().cpu().numpy()
+                    # Use last token pooling for Qodo-Embed
+                    pooled_output = self._last_token_pool(
+                        outputs.last_hidden_state, tokens["attention_mask"]
                     )
+                    embeddings = pooled_output.detach().cpu().numpy()
                 except (RuntimeError, OSError, SystemError) as e:
                     if "mps" in str(e).lower() or any(
                         term in str(e).lower()
@@ -1246,12 +1273,10 @@ class PatternIndexer:
                         tokens = {k: v.to(self.device) for k, v in tokens.items()}
                         with torch.no_grad():
                             outputs = self.model(**tokens)
-                            embeddings = (
-                                outputs.last_hidden_state[:, 0, :]
-                                .detach()
-                                .cpu()
-                                .numpy()
+                            pooled_output = self._last_token_pool(
+                                outputs.last_hidden_state, tokens["attention_mask"]
                             )
+                            embeddings = pooled_output.detach().cpu().numpy()
                     else:
                         raise e
 
@@ -1271,7 +1296,7 @@ class PatternIndexer:
         except Exception as e:
             logger.warning(f"Failed to extract embeddings for code snippet: {e}")
             # Return zero vector as fallback
-            return np.zeros(768)  # GraphCodeBERT has 768-dim embeddings
+            return np.zeros(1536)  # Qodo-Embed has 1536-dim embeddings
 
     def _normalize_embeddings(
         self, embeddings: np.ndarray[Any, np.dtype[np.floating[Any]]]

@@ -22,8 +22,8 @@
 
 """Code embeddings and similarity search for pattern-based analysis.
 
-This package provides GraphCodeBERT-based code embeddings and FAISS-powered
-similarity search for identifying similar code patterns within domain contexts.
+This package provides code embeddings and FAISS-powered similarity search
+for identifying similar code patterns within domain contexts.
 """
 
 from __future__ import annotations

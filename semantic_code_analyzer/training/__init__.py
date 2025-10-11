@@ -20,9 +20,9 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
-"""Training module for fine-tuning GraphCodeBERT models on custom codebases.
+"""Training module for fine-tuning code embedding models on custom codebases.
 
-This module provides functionality to fine-tune GraphCodeBERT using contrastive
+This module provides functionality to fine-tune code embedding models using contrastive
 learning to optimize embeddings for code style similarity measurement.
 """
 

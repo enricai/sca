@@ -91,7 +91,7 @@ class TestProgressReporting:
             progress_messages.append(message)
 
         config = {
-            "model_name": "microsoft/graphcodebert-base",
+            "model_name": "Qodo/Qodo-Embed-1-1.5B",
             "similarity_threshold": 0.3,
         }
 
@@ -111,7 +111,7 @@ class TestProgressReporting:
             "Initializing base analyzer...",
             "Initializing domain classifier...",
             "Checking ML model dependencies...",
-            "Loading GraphCodeBERT model (this may take a while)...",
+            "Loading code embedding model (this may take a while)...",
             "Finalizing analyzer configuration...",
             "Domain adherence analyzer ready!",
         ]
@@ -121,8 +121,8 @@ class TestProgressReporting:
                 expected in msg for msg in progress_messages
             ), f"Expected message '{expected}' not found in progress messages: {progress_messages}"
 
-    @patch("semantic_code_analyzer.embeddings.pattern_indexer.RobertaTokenizer")
-    @patch("semantic_code_analyzer.embeddings.pattern_indexer.RobertaModel")
+    @patch("semantic_code_analyzer.embeddings.pattern_indexer.AutoTokenizer")
+    @patch("semantic_code_analyzer.embeddings.pattern_indexer.AutoModel")
     def test_pattern_indexer_progress_callback(
         self, mock_model: MagicMock, mock_tokenizer: MagicMock
     ) -> None:
@@ -154,7 +154,7 @@ class TestProgressReporting:
         with patch.object(PatternIndexer, "_validate_mps_compatibility"):
             with patch.object(PatternIndexer, "_apply_hardware_optimizations"):
                 PatternIndexer(
-                    model_name="microsoft/graphcodebert-base",
+                    model_name="Qodo/Qodo-Embed-1-1.5B",
                     device_manager=mock_device_manager,
                     progress_callback=progress_callback,
                 )
@@ -168,8 +168,8 @@ class TestProgressReporting:
             "Initializing hardware acceleration...",
             "Configuring hardware optimizations...",
             "Validating device compatibility...",
-            "Loading GraphCodeBERT tokenizer...",
-            "Loading GraphCodeBERT model (this is the slow step)...",
+            "Loading model tokenizer...",
+            "Loading embedding model (this is the slow step)...",
             "Configuring model settings...",
             "Setting up device configuration...",
             "Pattern indexer ready!",

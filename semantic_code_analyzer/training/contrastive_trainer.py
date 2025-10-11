@@ -20,11 +20,11 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
-"""Contrastive learning trainer for fine-tuning RobertaModel.
+"""Contrastive learning trainer for fine-tuning code embedding models.
 
-This module implements contrastive learning to fine-tune RobertaModel
-(NOT RobertaForMaskedLM) on custom codebases. Uses the same model class
-that works for inference on MPS.
+This module implements contrastive learning to fine-tune code embedding models
+on custom codebases. Uses AutoModel for flexible architecture support and
+ensures MPS compatibility.
 """
 
 from __future__ import annotations
@@ -41,8 +41,8 @@ import torch
 import torch.nn.functional as F
 from torch.optim import AdamW
 from torch.utils.data import DataLoader, Dataset
-from tqdm import tqdm
-from transformers import RobertaModel, RobertaTokenizer, get_linear_schedule_with_warmup
+from tqdm import tqdm  # type: ignore[import-untyped]
+from transformers import AutoModel, AutoTokenizer, get_linear_schedule_with_warmup
 
 from ..hardware import DeviceManager, DeviceType
 from .data_preparation import CodeDatasetPreparator
@@ -53,7 +53,7 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class FineTuningConfig:
-    """Configuration for fine-tuning GraphCodeBERT with contrastive learning."""
+    """Configuration for fine-tuning code embedding models with contrastive learning."""
 
     # Training hyperparameters
     epochs: int = 3
@@ -77,7 +77,7 @@ class FineTuningConfig:
     gradient_accumulation_steps: int = 4
 
     # Model parameters
-    model_name: str = "microsoft/graphcodebert-base"
+    model_name: str = "Qodo/Qodo-Embed-1-1.5B"
     model_revision: str = "main"  # pragma: allowlist secret
 
     # Output parameters
@@ -94,14 +94,14 @@ class ContrastiveTripletDataset(Dataset[dict[str, Any]]):
     def __init__(
         self,
         pairs: list[CodePair],
-        tokenizer: RobertaTokenizer,
+        tokenizer: Any,
         max_length: int = 512,
     ):
         """Initialize contrastive dataset.
 
         Args:
             pairs: List of code pairs
-            tokenizer: RobertaTokenizer
+            tokenizer: Tokenizer instance (AutoTokenizer)
             max_length: Maximum sequence length
         """
         self.pairs = pairs
@@ -175,10 +175,10 @@ class ContrastiveTripletDataset(Dataset[dict[str, Any]]):
 
 
 class CodeStyleTrainer:
-    """Contrastive trainer for fine-tuning RobertaModel (base encoder only).
+    """Contrastive trainer for fine-tuning code embedding models (base encoder only).
 
-    This trainer uses RobertaModel instead of RobertaForMaskedLM to ensure
-    MPS compatibility and directly optimizes embeddings for similarity measurement.
+    This trainer uses AutoModel to support various model architectures and ensures
+    MPS compatibility while directly optimizing embeddings for similarity measurement.
     """
 
     def __init__(
@@ -217,22 +217,50 @@ class CodeStyleTrainer:
 
         # Initialize tokenizer
         logger.info(f"Loading tokenizer: {config.model_name}")
-        self.tokenizer = RobertaTokenizer.from_pretrained(
+        self.tokenizer = AutoTokenizer.from_pretrained(
             config.model_name,
             revision=config.model_revision,
             cache_dir=str(self.cache_dir),
         )  # nosec B615
 
         # Model will be loaded during training
-        self.model: RobertaModel | None = None
+        self.model: Any = None
 
         # Training state
         self.training_stats: dict[str, Any] = {}
 
+    def _last_token_pool(
+        self,
+        last_hidden_state: torch.Tensor,
+        attention_mask: torch.Tensor,
+    ) -> torch.Tensor:
+        """Pool embeddings using last token strategy (for Qodo-Embed).
+
+        Args:
+            last_hidden_state: Model output hidden states [batch_size, seq_len, hidden_dim]
+            attention_mask: Attention mask [batch_size, seq_len]
+
+        Returns:
+            Pooled embeddings [batch_size, hidden_dim]
+        """
+        # Get the position of the last non-padding token for each sequence
+        left_padding = attention_mask[:, -1].sum() == attention_mask.shape[0]
+
+        if left_padding:
+            return last_hidden_state[:, -1, :]
+        else:
+            # Right padding: find last non-padding token per sequence
+            sequence_lengths = attention_mask.sum(dim=1) - 1
+            batch_size = last_hidden_state.shape[0]
+            return last_hidden_state[
+                torch.arange(batch_size, device=last_hidden_state.device),
+                sequence_lengths,
+            ]
+
     def fine_tune_on_commit(
         self, commit_hash: str, output_name: str | None = None
     ) -> Path:
-        """Fine-tune RobertaModel using contrastive learning on a commit.
+        """Fine-tune code embedding model using contrastive learning on a commit.
 
         Args:
             commit_hash: Git commit hash to train on
@@ -286,10 +314,10 @@ class CodeStyleTrainer:
 
         logger.info(f"Split: {train_size} train, {val_size} val")
 
-        # Step 3: Load RobertaModel (NOT RobertaForMaskedLM - works on MPS!)
-        logger.info("Step 3/5: Loading RobertaModel (base encoder)...")
+        # Step 3: Load code embedding model (base encoder)
+        logger.info("Step 3/5: Loading code embedding model (base encoder)...")
 
-        self.model = RobertaModel.from_pretrained(
+        self.model = AutoModel.from_pretrained(
             self.config.model_name,
             revision=self.config.model_revision,
             cache_dir=str(self.cache_dir),
@@ -422,16 +450,17 @@ class CodeStyleTrainer:
             neg_ids = batch["negative_input_ids"].to(self.device)
             neg_mask = batch["negative_attention_mask"].to(self.device)
 
-            # Get embeddings (CLS token)
-            anchor_emb = self.model(
-                input_ids=anchor_ids, attention_mask=anchor_mask
-            ).last_hidden_state[:, 0, :]
-            pos_emb = self.model(
-                input_ids=pos_ids, attention_mask=pos_mask
-            ).last_hidden_state[:, 0, :]
-            neg_emb = self.model(
-                input_ids=neg_ids, attention_mask=neg_mask
-            ).last_hidden_state[:, 0, :]
+            # Get embeddings (last token pooling)
+            anchor_output = self.model(input_ids=anchor_ids, attention_mask=anchor_mask)
+            anchor_emb = self._last_token_pool(
+                anchor_output.last_hidden_state, anchor_mask
+            )
+
+            pos_output = self.model(input_ids=pos_ids, attention_mask=pos_mask)
+            pos_emb = self._last_token_pool(pos_output.last_hidden_state, pos_mask)
+
+            neg_output = self.model(input_ids=neg_ids, attention_mask=neg_mask)
+            neg_emb = self._last_token_pool(neg_output.last_hidden_state, neg_mask)
 
             # Contrastive loss (InfoNCE)
             loss = self._contrastive_loss(anchor_emb, pos_emb, neg_emb)
@@ -487,15 +516,18 @@ class CodeStyleTrainer:
                 neg_ids = batch["negative_input_ids"].to(self.device)
                 neg_mask = batch["negative_attention_mask"].to(self.device)
 
-                anchor_emb = self.model(
+                anchor_output = self.model(
                     input_ids=anchor_ids, attention_mask=anchor_mask
-                ).last_hidden_state[:, 0, :]
-                pos_emb = self.model(
-                    input_ids=pos_ids, attention_mask=pos_mask
-                ).last_hidden_state[:, 0, :]
-                neg_emb = self.model(
-                    input_ids=neg_ids, attention_mask=neg_mask
-                ).last_hidden_state[:, 0, :]
+                )
+                anchor_emb = self._last_token_pool(
+                    anchor_output.last_hidden_state, anchor_mask
+                )
+
+                pos_output = self.model(input_ids=pos_ids, attention_mask=pos_mask)
+                pos_emb = self._last_token_pool(pos_output.last_hidden_state, pos_mask)
+
+                neg_output = self.model(input_ids=neg_ids, attention_mask=neg_mask)
+                neg_emb = self._last_token_pool(neg_output.last_hidden_state, neg_mask)
 
                 loss = self._contrastive_loss(anchor_emb, pos_emb, neg_emb)
                 total_loss += loss.item()
@@ -537,7 +569,7 @@ class CodeStyleTrainer:
         return loss
 
     def _save_model(self, commit_hash: str, output_name: str | None = None) -> Path:
-        """Save fine-tuned RobertaModel.
+        """Save fine-tuned code embedding model.
 
         Args:
             commit_hash: Source commit hash
@@ -553,9 +585,9 @@ class CodeStyleTrainer:
         output_dir = self.cache_dir / "fine_tuned_models" / model_name
         output_dir.mkdir(parents=True, exist_ok=True)
 
-        logger.info(f"Saving fine-tuned RobertaModel to {output_dir}")
+        logger.info(f"Saving fine-tuned model to {output_dir}")
 
-        # Save RobertaModel directly (same class used for inference!)
+        # Save model directly (same class used for inference!)
         self.model.save_pretrained(output_dir, safe_serialization=True)
         self.tokenizer.save_pretrained(output_dir)
 
