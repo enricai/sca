@@ -84,6 +84,11 @@ class FineTuningConfig:
     save_steps: int = 500
     logging_steps: int = 100
 
+    # HuggingFace Hub parameters
+    push_to_hub: bool = False  # Whether to push model to HuggingFace Hub
+    hub_model_id: str | None = None  # Hub model ID (e.g., "username/model-name")
+    hub_private: bool = False  # Whether to create a private Hub repository
+
 
 class ContrastiveTripletDataset(Dataset[dict[str, Any]]):
     """PyTorch Dataset for contrastive learning with triplets.
@@ -569,7 +574,7 @@ class CodeStyleTrainer:
         return loss
 
     def _save_model(self, commit_hash: str, output_name: str | None = None) -> Path:
-        """Save fine-tuned code embedding model.
+        """Save fine-tuned code embedding model and optionally push to HuggingFace Hub.
 
         Args:
             commit_hash: Source commit hash
@@ -605,4 +610,192 @@ class CodeStyleTrainer:
         with open(output_dir / "metadata.json", "w", encoding="utf-8") as f:
             json.dump(metadata, f, indent=2)
 
+        # Push to HuggingFace Hub if requested
+        if self.config.push_to_hub:
+            self._push_to_huggingface_hub(output_dir, commit_hash, metadata)
+
         return output_dir
+
+    def _generate_model_card(
+        self, commit_hash: str, hub_model_id: str, metadata: dict[str, Any]
+    ) -> str:
+        """Generate a model card (README.md) for HuggingFace Hub.
+
+        Args:
+            commit_hash: Source commit hash
+            hub_model_id: Hub model ID
+            metadata: Training metadata
+
+        Returns:
+            Model card content as markdown string
+        """
+        training_config = metadata.get("training_config", {})
+        training_stats = metadata.get("training_stats", {})
+
+        model_card = f"""---
+library_name: transformers
+base_model: {metadata.get('model_name', 'Qodo/Qodo-Embed-1-1.5B')}
+tags:
+- code
+- embeddings
+- semantic-code-analyzer
+- fine-tuned
+---
+
+# {hub_model_id}
+
+Fine-tuned code embedding model trained with [Semantic Code Analyzer](https://github.com/sca/semantic-code-analyzer) for custom code style pattern matching.
+
+## Model Details
+
+- **Base Model:** {metadata.get('model_name', 'Qodo/Qodo-Embed-1-1.5B')}
+- **Training Method:** Contrastive Learning (InfoNCE loss)
+- **Training Commit:** `{commit_hash}`
+- **Training Device:** {metadata.get('device', 'N/A')}
+- **Timestamp:** {time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(metadata.get('timestamp', time.time())))}
+
+## Training Configuration
+
+- **Epochs:** {training_config.get('epochs', 3)}
+- **Batch Size:** {training_config.get('batch_size', 8)}
+- **Learning Rate:** {training_config.get('learning_rate', 5e-5)}
+- **Gradient Accumulation Steps:** {training_config.get('gradient_accumulation_steps', 4)}
+- **Temperature:** {training_config.get('temperature', 0.07)}
+- **Max Files:** {training_config.get('max_files', 1000)}
+
+## Training Statistics
+
+- **Training Epochs:** {training_stats.get('epochs', 'N/A')}
+- **Final Training Loss:** {training_stats.get('train_losses', [0])[-1]:.4f if training_stats.get('train_losses') else 'N/A'}
+- **Final Validation Loss:** {training_stats.get('val_losses', [0])[-1]:.4f if training_stats.get('val_losses') else 'N/A'}
+
+## Usage
+
+```bash
+# Analyze code using this fine-tuned model
+sca-analyze analyze HEAD --fine-tuned-model {hub_model_id}
+
+# Or programmatically
+from semantic_code_analyzer import MultiDimensionalScorer, EnhancedScorerConfig
+
+config = EnhancedScorerConfig(
+    fine_tuned_model_commit="{hub_model_id}"
+)
+scorer = MultiDimensionalScorer(config, repo_path=".")
+results = scorer.analyze_commit("HEAD")
+```
+
+## How It Works
+
+This model has been fine-tuned using contrastive learning to understand your specific codebase's style patterns, naming conventions, and architectural decisions. It produces better similarity scores when analyzing code that follows your established patterns.
+
+## License
+
+Inherits license from base model: [Qodo-Embed-1-1.5B](https://huggingface.co/Qodo/Qodo-Embed-1-1.5B)
+"""
+        return model_card
+
+    def _push_to_huggingface_hub(
+        self, model_dir: Path, commit_hash: str, metadata: dict[str, Any]
+    ) -> None:
+        """Push fine-tuned model to HuggingFace Hub with model card and progress feedback.
+
+        Args:
+            model_dir: Local directory with saved model
+            commit_hash: Source commit hash
+            metadata: Training metadata
+        """
+        try:
+            from huggingface_hub import HfApi, create_repo
+
+            # Determine model ID
+            if self.config.hub_model_id:
+                hub_model_id = self.config.hub_model_id
+            else:
+                # Auto-generate model ID from commit hash
+                hub_model_id = f"sca-finetuned-{commit_hash[:7]}"
+
+            logger.info(f"Pushing model to HuggingFace Hub: {hub_model_id}")
+            print(f"\n📤 Uploading to HuggingFace Hub: {hub_model_id}")
+
+            # Create repository if it doesn't exist
+            try:
+                print("   Creating repository...")
+                create_repo(
+                    repo_id=hub_model_id,
+                    private=self.config.hub_private,
+                    exist_ok=True,
+                )
+                privacy_status = "private" if self.config.hub_private else "public"
+                logger.info(
+                    f"Repository created/verified: {hub_model_id} ({privacy_status})"
+                )
+                print(f"   ✓ Repository ready ({privacy_status})")
+            except Exception as e:
+                logger.warning(f"Could not create repository: {e}")
+                print(f"   ⚠️  Repository creation warning: {e}")
+
+            # Generate and save model card
+            print("   Generating model card...")
+            model_card = self._generate_model_card(commit_hash, hub_model_id, metadata)
+            readme_path = model_dir / "README.md"
+            with open(readme_path, "w", encoding="utf-8") as f:
+                f.write(model_card)
+            logger.info("Model card generated")
+            print("   ✓ Model card generated")
+
+            # Upload model
+            print("   Uploading model weights (this may take a few minutes)...")
+            self.model.push_to_hub(
+                repo_id=hub_model_id,
+                commit_message=f"Fine-tuned on commit {commit_hash}",
+                safe_serialization=True,
+            )
+            print("   ✓ Model weights uploaded")
+
+            # Upload tokenizer
+            print("   Uploading tokenizer...")
+            self.tokenizer.push_to_hub(
+                repo_id=hub_model_id,
+                commit_message=f"Fine-tuned tokenizer for commit {commit_hash}",
+            )
+            print("   ✓ Tokenizer uploaded")
+
+            # Upload metadata and model card
+            print("   Uploading metadata and model card...")
+            api = HfApi()
+            api.upload_file(
+                path_or_fileobj=str(model_dir / "metadata.json"),
+                path_in_repo="metadata.json",
+                repo_id=hub_model_id,
+                commit_message="Upload training metadata",
+            )
+            api.upload_file(
+                path_or_fileobj=str(readme_path),
+                path_in_repo="README.md",
+                repo_id=hub_model_id,
+                commit_message="Upload model card",
+            )
+            print("   ✓ Metadata and model card uploaded")
+
+            logger.info(
+                f"Successfully pushed model to: https://huggingface.co/{hub_model_id}"
+            )
+            print(f"\n✅ Model uploaded to HuggingFace Hub: {hub_model_id}")
+            print(f"   View at: https://huggingface.co/{hub_model_id}")
+            print(f"   Use with: --fine-tuned-model {hub_model_id}\n")
+
+        except ImportError:
+            logger.error(
+                "huggingface_hub not installed. Install with: pip install huggingface-hub"
+            )
+            raise ValueError(
+                "huggingface_hub required for pushing to Hub. "
+                "Install with: pip install huggingface-hub"
+            ) from None
+        except Exception as e:
+            logger.error(f"Failed to push model to HuggingFace Hub: {e}")
+            raise ValueError(
+                f"Failed to push to HuggingFace Hub: {e}. "
+                "Ensure you're authenticated (huggingface-cli login or HF_TOKEN env var)"
+            ) from e

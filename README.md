@@ -72,8 +72,8 @@ pip install semantic-code-analyzer
 conda create -n sca python=3.10 -y
 conda activate sca
 
-# Fix OpenMP library conflicts (required for ML libraries)
-conda env config vars set KMP_DUPLICATE_LIB_OK=TRUE
+# Fix OpenMP library conflicts and tokenizer parallelism warnings
+conda env config vars set KMP_DUPLICATE_LIB_OK=TRUE TOKENIZERS_PARALLELISM=false
 conda deactivate
 conda activate sca
 
@@ -460,19 +460,51 @@ sca-analyze analyze abc123def --fine-tuned-model HEAD
 sca-analyze fine-tune <commit_hash> [OPTIONS]
 
 Options:
-  --repo-path TEXT          Repository path (default: current directory)
-  --epochs INTEGER          Training epochs (default: 3)
-  --batch-size INTEGER      Batch size (default: 8)
-  --learning-rate FLOAT     Learning rate (default: 5e-5)
-  --max-files INTEGER       Max files for training (default: 1000)
-  --device [auto|cpu|mps|cuda]  Hardware device (default: auto)
-  --output-name TEXT        Custom model name (default: commit hash)
+  --repo-path TEXT             Repository path (default: current directory)
+  --epochs INTEGER             Training epochs (default: 3)
+  --batch-size INTEGER         Batch size (default: 8)
+  --learning-rate FLOAT        Learning rate (default: 5e-5)
+  --max-files INTEGER          Max files for training (default: 1000)
+  --device [auto|cpu|mps|cuda] Hardware device (default: auto)
+  --output-name TEXT           Custom model name (default: commit hash)
+  --push-to-hub                Push model to HuggingFace Hub
+  --hub-model-id TEXT          Hub model ID (e.g., 'username/model-name')
+  --private                    Create private Hub repository (requires --push-to-hub)
 ```
+
+### HuggingFace Hub Integration
+
+Train on cloud GPU and share models across machines:
+
+```bash
+# 1. Authenticate with HuggingFace (one-time setup)
+huggingface-cli login
+# or set token: export HF_TOKEN=your_token_here
+
+# 2. Fine-tune on cloud GPU (A100) and push to Hub
+sca-analyze fine-tune HEAD \
+  --repo-path . \
+  --epochs 3 \
+  --batch-size 8 \
+  --push-to-hub \
+  --hub-model-id username/my-code-style
+
+# 3. Use the model on any machine (downloads automatically)
+sca-analyze analyze HEAD --fine-tuned-model username/my-code-style
+```
+
+**Benefits:**
+- Train on powerful cloud GPUs (A100: ~30-60 min vs M3: ~48 hours)
+- Share models across team members
+- Access models from any machine
+- Version control for fine-tuned models
 
 ### Performance Notes
 
-- Training takes **30-45 minutes on Apple M3** for typical codebases
-- Requires ~8GB memory minimum (16GB+ recommended)
+- **Cloud GPU (A100)**: 30-60 minutes, ~$1-2 cost
+- **Apple M3** (batch-size 2): ~48 hours (use cloud GPU instead!)
+- **Apple M3** (batch-size 8): Out of memory (requires 28GB+)
+- Requires ~8GB memory minimum for inference (16GB+ for training)
 - MPS acceleration supported on Apple Silicon
 - CUDA acceleration supported on NVIDIA GPUs
 

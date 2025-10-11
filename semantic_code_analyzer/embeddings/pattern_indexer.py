@@ -1493,21 +1493,69 @@ class PatternIndexer:
         return result
 
     def _get_fine_tuned_model_path(self, commit_hash: str | None = None) -> Path:
-        """Get the path to a fine-tuned model.
+        """Get the path to a fine-tuned model (local or download from HuggingFace Hub).
 
         Args:
-            commit_hash: Commit hash of the fine-tuned model (optional, uses self.fine_tuned_model_commit if None)
+            commit_hash: Commit hash or HuggingFace Hub model ID (e.g., "username/model-name")
 
         Returns:
             Path to fine-tuned model directory
         """
-        commit = commit_hash or self.fine_tuned_model_commit
-        if not commit:
-            raise ValueError("No commit hash provided for fine-tuned model")
+        model_id = commit_hash or self.fine_tuned_model_commit
+        if not model_id:
+            raise ValueError("No model ID provided for fine-tuned model")
 
-        # Use first 7 characters of commit hash as model name
-        model_name = commit[:7]
-        return self.cache_dir / "fine_tuned_models" / model_name
+        # Check if this is a HuggingFace Hub model ID (contains '/')
+        if "/" in model_id:
+            return self._download_from_huggingface_hub(model_id)
+        else:
+            # Local model: use first 7 characters of commit hash as model name
+            model_name = model_id[:7]
+            return self.cache_dir / "fine_tuned_models" / model_name
+
+    def _download_from_huggingface_hub(self, hub_model_id: str) -> Path:
+        """Download a fine-tuned model from HuggingFace Hub.
+
+        Args:
+            hub_model_id: HuggingFace Hub model ID (e.g., "username/model-name")
+
+        Returns:
+            Path to downloaded model directory
+        """
+        try:
+            from huggingface_hub import snapshot_download
+
+            # Create cache directory for Hub models
+            hub_cache_dir = self.cache_dir / "hub_models"
+            hub_cache_dir.mkdir(exist_ok=True)
+
+            # Sanitize model ID for directory name (replace / with --)
+            safe_model_name = hub_model_id.replace("/", "--")
+            local_model_dir = hub_cache_dir / safe_model_name
+
+            # Download if not already cached
+            if not local_model_dir.exists():
+                logger.info(f"Downloading model from HuggingFace Hub: {hub_model_id}")
+                downloaded_path = snapshot_download(
+                    repo_id=hub_model_id,
+                    cache_dir=str(hub_cache_dir),
+                    local_dir=str(local_model_dir),
+                    local_dir_use_symlinks=False,
+                )
+                logger.info(f"Model downloaded to: {downloaded_path}")
+            else:
+                logger.info(f"Using cached Hub model from: {local_model_dir}")
+
+            return local_model_dir
+
+        except ImportError:
+            raise ValueError(
+                "huggingface_hub not installed. Install with: pip install huggingface-hub"
+            ) from None
+        except Exception as e:
+            raise ValueError(
+                f"Failed to download model from HuggingFace Hub ({hub_model_id}): {e}"
+            ) from e
 
     def get_model_info(self) -> dict[str, Any]:
         """Get information about the currently loaded model.

@@ -7,10 +7,10 @@ code in this repository.
 
 - Setup environment: `conda create -n sca python=3.10 -y && conda activate sca`
   (Python 3.10+ required)
-- Fix OpenMP conflicts:
+- Fix OpenMP conflicts and tokenizer parallelism warnings:
 
   ```bash
-  conda env config vars set KMP_DUPLICATE_LIB_OK=TRUE
+  conda env config vars set KMP_DUPLICATE_LIB_OK=TRUE TOKENIZERS_PARALLELISM=false
   conda deactivate
   conda activate sca
   ```
@@ -42,7 +42,13 @@ code in this repository.
   `sca-analyze analyze HEAD --disable-domain-adherence --disable-pattern-indices`
 - Fine-tune model:
   `sca-analyze fine-tune HEAD --repo-path . --epochs 3 --batch-size 8`
-- Use fine-tuned model: `sca-analyze analyze HEAD --fine-tuned-model abc123d`
+- Fine-tune and push to HuggingFace Hub (public):
+  `sca-analyze fine-tune HEAD --repo-path . --epochs 3 --batch-size 8 --push-to-hub --hub-model-id username/model-name`
+- Fine-tune and push to HuggingFace Hub (private):
+  `sca-analyze fine-tune HEAD --repo-path . --epochs 3 --batch-size 8 --push-to-hub --hub-model-id username/model-name --private`
+- Use fine-tuned model (local): `sca-analyze analyze HEAD --fine-tuned-model abc123d`
+- Use fine-tuned model (from Hub):
+  `sca-analyze analyze HEAD --fine-tuned-model username/model-name`
 - Specify hardware device: `sca-analyze analyze HEAD --device mps`
   (options: auto, cpu, mps, cuda)
 

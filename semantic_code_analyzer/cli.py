@@ -242,7 +242,7 @@ def cli(ctx: click.Context, verbose: bool) -> None:
 )
 @click.option(
     "--fine-tuned-model",
-    help="Use a fine-tuned code embedding model from a specific commit (specify commit hash or model name)",
+    help="Use a fine-tuned code embedding model (commit hash like 'abc123d' or HuggingFace Hub ID like 'username/model-name')",
 )
 @click.pass_context
 def analyze(
@@ -1038,6 +1038,20 @@ def _get_severity_color(severity: str) -> str:
     "--output-name",
     help="Custom name for fine-tuned model (default: commit hash)",
 )
+@click.option(
+    "--push-to-hub",
+    is_flag=True,
+    help="Push fine-tuned model to HuggingFace Hub (requires authentication)",
+)
+@click.option(
+    "--hub-model-id",
+    help="HuggingFace Hub model ID (e.g., 'username/model-name'). Auto-generated if not provided.",
+)
+@click.option(
+    "--private",
+    is_flag=True,
+    help="Create private repository on HuggingFace Hub (requires --push-to-hub)",
+)
 @click.pass_context
 def fine_tune(
     ctx: click.Context,
@@ -1049,6 +1063,9 @@ def fine_tune(
     max_files: int,
     device: str,
     output_name: str | None,
+    push_to_hub: bool,
+    hub_model_id: str | None,
+    private: bool,
 ) -> None:
     """Fine-tune code embedding model on a specific commit to learn code style patterns.
 
@@ -1140,6 +1157,9 @@ def fine_tune(
             learning_rate=learning_rate,
             max_files=max_files,
             device_preference=device,
+            push_to_hub=push_to_hub,
+            hub_model_id=hub_model_id,
+            hub_private=private,
         )
 
         # Initialize trainer
@@ -1195,9 +1215,17 @@ def fine_tune(
 
         console.print("")
         console.print("[bold]To use this fine-tuned model:[/bold]")
-        console.print(
-            f"  sca-analyze analyze <commit> --fine-tuned-model {commit_hash[:7]}"
-        )
+
+        # Show appropriate command based on whether model was pushed to Hub
+        if push_to_hub:
+            model_id = hub_model_id or f"sca-finetuned-{commit_hash[:7]}"
+            console.print(
+                f"  sca-analyze analyze <commit> --fine-tuned-model {model_id}"
+            )
+        else:
+            console.print(
+                f"  sca-analyze analyze <commit> --fine-tuned-model {commit_hash[:7]}"
+            )
 
     except Exception as e:
         console.print(f"[red]Error during fine-tuning: {e}[/red]")
