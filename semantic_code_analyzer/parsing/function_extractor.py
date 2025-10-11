@@ -20,32 +20,10 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
-# MIT License
-#
-# Copyright (c) 2024 Semantic Code Analyzer Contributors
-#
-# Permission is hereby granted, free of charge to any person obtaining a copy
-# of this software and associated documentation files (the "Software"), to deal
-# in the Software without restriction, including without limitation the rights
-# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-# copies of the Software, and to permit persons to whom the Software is
-# furnished to do so, subject to the following conditions:
-#
-# The above copyright notice and this permission notice shall be included in all
-# copies or substantial portions of the Software.
-#
-# THE SOFTWARE IS PROVIDED "AS IS" WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-# SOFTWARE.
-
 """Function-level code extraction using Tree-sitter for universal AST parsing.
 
 This module provides functionality to extract functions from source code files
-across multiple programming languages using tree-sitter parsers.
+across multiple programming languages using tree-sitter query-based parsing.
 """
 
 from __future__ import annotations
@@ -55,14 +33,13 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from .language_registry import LanguageRegistry
+
 logger = logging.getLogger(__name__)
 
 # Try to import tree-sitter dependencies
 try:
-    from tree_sitter import Language, Parser
-    from tree_sitter_javascript import language as javascript_language
-    from tree_sitter_python import language as python_language
-    from tree_sitter_typescript import language_typescript as typescript_language
+    from tree_sitter import Query, QueryCursor  # type: ignore[attr-defined]
 
     TREE_SITTER_AVAILABLE = True
 except ImportError:
@@ -102,61 +79,40 @@ class FunctionChunk:
 
 
 class FunctionExtractor:
-    """Extract functions from source code using tree-sitter AST parsing.
+    """Extract functions from source code using tree-sitter query-based parsing.
 
-    This class provides universal function extraction across multiple programming
-    languages, extracting both standalone functions and class methods.
+    This class provides universal function extraction across 10+ programming
+    languages using declarative tree-sitter queries, making it extensible to
+    any language with a tree-sitter grammar.
     """
 
     def __init__(self) -> None:
-        """Initialize the FunctionExtractor with language parsers."""
-        # Initialize parsers dict (will be empty if tree-sitter not available)
-        self.parsers: dict[str, Any] = (
-            {}
-        )  # Use Any for Parser type to avoid mypy issues
-
+        """Initialize the FunctionExtractor with language registry."""
         if not TREE_SITTER_AVAILABLE:
             logger.warning(
                 "FunctionExtractor initialized without tree-sitter support. "
                 "Function extraction will fall back to simple chunking."
             )
+            self.language_registry: LanguageRegistry | None = None
             return
 
-        # Python parser
+        # Initialize language registry for automatic parser discovery
         try:
-            python_parser = Parser()  # type: ignore[misc]
-            python_parser.set_language(Language(python_language()))  # type: ignore[attr-defined]
-            self.parsers[".py"] = python_parser
-            logger.debug("Initialized Python parser")
-        except Exception as e:
-            logger.warning(f"Failed to initialize Python parser: {e}")
+            self.language_registry = LanguageRegistry()
+            supported_langs = self.language_registry.get_available_languages()
+            supported_exts = self.language_registry.get_supported_extensions()
 
-        # JavaScript parser
-        try:
-            js_parser = Parser()  # type: ignore[misc]
-            js_parser.set_language(Language(javascript_language()))  # type: ignore[attr-defined]
-            self.parsers[".js"] = js_parser
-            self.parsers[".jsx"] = js_parser
-            logger.debug("Initialized JavaScript parser")
-        except Exception as e:
-            logger.warning(f"Failed to initialize JavaScript parser: {e}")
+            logger.info(
+                f"FunctionExtractor initialized with {len(supported_langs)} languages: {supported_langs}"
+            )
+            logger.debug(f"Supported extensions: {sorted(supported_exts)}")
 
-        # TypeScript parser
-        try:
-            ts_parser = Parser()  # type: ignore[misc]
-            ts_parser.set_language(Language(typescript_language()))  # type: ignore[attr-defined]
-            self.parsers[".ts"] = ts_parser
-            self.parsers[".tsx"] = ts_parser
-            logger.debug("Initialized TypeScript parser")
         except Exception as e:
-            logger.warning(f"Failed to initialize TypeScript parser: {e}")
-
-        logger.info(
-            f"FunctionExtractor initialized with {len(self.parsers)} language parsers"
-        )
+            logger.error(f"Failed to initialize LanguageRegistry: {e}")
+            self.language_registry = None
 
     def extract_functions(self, file_path: str, content: str) -> list[FunctionChunk]:
-        """Extract functions from source code file.
+        """Extract functions from source code file using universal query-based parsing.
 
         Args:
             file_path: Path to the file being analyzed
@@ -165,7 +121,7 @@ class FunctionExtractor:
         Returns:
             List of FunctionChunk objects containing functions with their metadata
         """
-        if not TREE_SITTER_AVAILABLE or not self.parsers:
+        if not TREE_SITTER_AVAILABLE or not self.language_registry:
             logger.debug(
                 f"Tree-sitter not available for {file_path}, using fallback chunking"
             )
@@ -174,22 +130,24 @@ class FunctionExtractor:
         # Get file extension
         file_ext = Path(file_path).suffix.lower()
 
-        if file_ext not in self.parsers:
-            logger.debug(f"No parser available for {file_ext}, using fallback chunking")
+        # Get language configuration
+        lang_config = self.language_registry.get_language_for_extension(file_ext)
+        if not lang_config:
+            logger.debug(f"No language support for {file_ext}, using fallback chunking")
             return self._fallback_extraction(file_path, content)
 
         try:
-            parser = self.parsers[file_ext]
-
             # Parse the content
-            tree = parser.parse(bytes(content, "utf8"))
+            tree = lang_config.parser.parse(bytes(content, "utf8"))
             root_node = tree.root_node
 
-            # Extract imports
-            imports = self._extract_imports(root_node, content, file_ext)
+            # Extract imports using queries
+            imports = self._extract_imports_with_query(lang_config, root_node, content)
 
-            # Extract functions and methods
-            functions = self._extract_function_nodes(root_node, content, file_ext)
+            # Extract functions using queries
+            functions = self._extract_functions_with_query(
+                lang_config, root_node, content
+            )
 
             # Create FunctionChunk objects
             chunks = []
@@ -206,7 +164,7 @@ class FunctionExtractor:
                 chunks.append(chunk)
 
             logger.debug(
-                f"Extracted {len(chunks)} functions from {file_path} using tree-sitter"
+                f"Extracted {len(chunks)} functions from {file_path} using {lang_config.name} queries"
             )
             return chunks
 
@@ -214,64 +172,48 @@ class FunctionExtractor:
             logger.warning(f"Failed to extract functions from {file_path}: {e}")
             return self._fallback_extraction(file_path, content)
 
-    def _extract_imports(self, root_node: Any, content: str, file_ext: str) -> str:
-        """Extract all import statements from the file.
+    def _extract_imports_with_query(
+        self, lang_config: Any, root_node: Any, content: str
+    ) -> str:
+        """Extract import statements using tree-sitter queries.
 
         Args:
+            lang_config: Language configuration with query string
             root_node: Tree-sitter root node
             content: File content
-            file_ext: File extension
 
         Returns:
             String containing all import statements
         """
-        import_lines = []
+        try:
+            # Create query and cursor
+            query = Query(lang_config.parser.language, lang_config.query_string)
+            cursor = QueryCursor(query)
 
-        if file_ext == ".py":
-            # Python imports
-            import_types = ["import_statement", "import_from_statement"]
-        elif file_ext in [".js", ".jsx", ".ts", ".tsx"]:
-            # JavaScript/TypeScript imports
-            import_types = ["import_statement"]
-        else:
-            return ""
+            # Execute query - returns dict of {capture_name: [nodes]}
+            captures_dict = cursor.captures(root_node)
 
-        # Find all import nodes
-        for child in root_node.children:
-            if child.type in import_types:
-                import_text = content[child.start_byte : child.end_byte]
+            # Collect import nodes
+            import_lines = []
+            import_nodes = captures_dict.get("import", [])
+
+            for node in import_nodes:
+                import_text = content[node.start_byte : node.end_byte]
                 import_lines.append(import_text)
 
-        return "\n".join(import_lines)
+            return "\n".join(import_lines)
 
-    def _extract_function_nodes(
-        self, root_node: Any, content: str, file_ext: str
+        except Exception as e:
+            logger.debug(f"Failed to extract imports with query: {e}")
+            return ""
+
+    def _extract_functions_with_query(
+        self, lang_config: Any, root_node: Any, content: str
     ) -> list[dict[str, Any]]:
-        """Extract function nodes from the AST.
+        """Extract functions using tree-sitter queries (universal approach).
 
         Args:
-            root_node: Tree-sitter root node
-            content: File content
-            file_ext: File extension
-
-        Returns:
-            List of function information dictionaries
-        """
-        functions = []
-
-        if file_ext == ".py":
-            functions = self._extract_python_functions(root_node, content)
-        elif file_ext in [".js", ".jsx", ".ts", ".tsx"]:
-            functions = self._extract_js_ts_functions(root_node, content)
-
-        return functions
-
-    def _extract_python_functions(
-        self, root_node: Any, content: str
-    ) -> list[dict[str, Any]]:
-        """Extract Python functions and methods.
-
-        Args:
+            lang_config: Language configuration with query string
             root_node: Tree-sitter root node
             content: File content
 
@@ -280,104 +222,87 @@ class FunctionExtractor:
         """
         functions = []
 
-        def visit_node(node: Any, is_in_class: bool = False) -> None:
-            """Recursively visit nodes to find functions."""
-            if node.type == "function_definition":
-                func_name = self._get_function_name(node, content)
+        try:
+            # Create query and cursor
+            query = Query(lang_config.parser.language, lang_config.query_string)
+            cursor = QueryCursor(query)
+
+            # Execute query - returns dict of {capture_name: [nodes]}
+            captures_dict = cursor.captures(root_node)
+
+            # Track which functions we've already seen to avoid duplicates
+            seen_functions: set[tuple[str, int]] = set()
+
+            # Process function.def captures
+            function_nodes = captures_dict.get("function.def", [])
+            for node in function_nodes:
+                func_name = self._extract_name_from_node(node, content)
                 func_code = content[node.start_byte : node.end_byte]
                 start_line = node.start_point[0] + 1
                 end_line = node.end_point[0] + 1
 
-                functions.append(
-                    {
-                        "name": func_name,
-                        "code": func_code,
-                        "is_method": is_in_class,
-                        "start_line": start_line,
-                        "end_line": end_line,
-                    }
-                )
+                func_key = (func_name, start_line)
+                if func_key not in seen_functions:
+                    seen_functions.add(func_key)
+                    if func_name:
+                        functions.append(
+                            {
+                                "name": func_name,
+                                "code": func_code,
+                                "is_method": False,
+                                "start_line": start_line,
+                                "end_line": end_line,
+                            }
+                        )
 
-            # Check if entering a class
-            entering_class = node.type == "class_definition"
-
-            # Recursively visit children
-            for child in node.children:
-                visit_node(child, is_in_class=entering_class or is_in_class)
-
-        visit_node(root_node)
-        return functions
-
-    def _extract_js_ts_functions(
-        self, root_node: Any, content: str
-    ) -> list[dict[str, Any]]:
-        """Extract JavaScript/TypeScript functions and methods.
-
-        Args:
-            root_node: Tree-sitter root node
-            content: File content
-
-        Returns:
-            List of function information dictionaries
-        """
-        functions = []
-
-        def visit_node(node: Any, is_in_class: bool = False) -> None:
-            """Recursively visit nodes to find functions."""
-            # Function declarations and expressions
-            if node.type in [
-                "function_declaration",
-                "function",
-                "arrow_function",
-                "method_definition",
-            ]:
-                func_name = self._get_function_name(node, content)
+            # Process method.def captures
+            method_nodes = captures_dict.get("method.def", [])
+            for node in method_nodes:
+                func_name = self._extract_name_from_node(node, content)
                 func_code = content[node.start_byte : node.end_byte]
                 start_line = node.start_point[0] + 1
                 end_line = node.end_point[0] + 1
 
-                # Skip empty names (anonymous functions without clear context)
-                if func_name:
-                    functions.append(
-                        {
-                            "name": func_name,
-                            "code": func_code,
-                            "is_method": is_in_class
-                            or node.type == "method_definition",
-                            "start_line": start_line,
-                            "end_line": end_line,
-                        }
-                    )
+                func_key = (func_name, start_line)
+                if func_key not in seen_functions:
+                    seen_functions.add(func_key)
+                    if func_name:
+                        functions.append(
+                            {
+                                "name": func_name,
+                                "code": func_code,
+                                "is_method": True,
+                                "start_line": start_line,
+                                "end_line": end_line,
+                            }
+                        )
 
-            # Check if entering a class
-            entering_class = node.type in ["class_declaration", "class"]
+            logger.debug(
+                f"Query-based extraction found {len(functions)} functions using {lang_config.name}"
+            )
+            return functions
 
-            # Recursively visit children
-            for child in node.children:
-                visit_node(child, is_in_class=entering_class or is_in_class)
+        except Exception as e:
+            logger.warning(f"Failed to extract functions with query: {e}")
+            return []
 
-        visit_node(root_node)
-        return functions
-
-    def _get_function_name(self, node: Any, content: str) -> str:
-        """Extract function name from a function node.
+    def _extract_name_from_node(self, node: Any, content: str) -> str:
+        """Extract name from a function/method node.
 
         Args:
-            node: Tree-sitter function node
+            node: Tree-sitter node
             content: File content
 
         Returns:
-            Function name or placeholder
+            Function/method name or line-based fallback
         """
-        # Try to find identifier node
+        # Try to find identifier child nodes
         for child in node.children:
-            if child.type == "identifier":
-                return content[child.start_byte : child.end_byte]
-            elif child.type == "property_identifier":
+            if child.type in ["identifier", "property_identifier", "field_identifier"]:
                 return content[child.start_byte : child.end_byte]
 
-        # For arrow functions, try to find the variable name
-        if node.type == "arrow_function" and node.parent:
+        # For arrow functions or variable declarators, check parent
+        if node.parent:
             parent = node.parent
             if parent.type == "variable_declarator":
                 for sibling in parent.children:

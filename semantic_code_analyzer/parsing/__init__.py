@@ -25,5 +25,10 @@
 from __future__ import annotations
 
 from .function_extractor import FunctionChunk, FunctionExtractor
+from .language_registry import LanguageRegistry
 
-__all__ = ["FunctionExtractor", "FunctionChunk"]
+__all__ = [
+    "FunctionExtractor",
+    "FunctionChunk",
+    "LanguageRegistry",
+]

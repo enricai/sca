@@ -306,6 +306,7 @@ class DomainClassifier(BaseAnalyzer):
             },
             ArchitecturalDomain.CONFIGURATION: {
                 "path_patterns": [
+                    r"(^|.*/)(constants?|config)(/.*)?$",  # Match /constants/ and /config/ directories
                     r".*\.config\.(ts|js|json)$",
                     r".*\.json$",
                     r".*\.env.*$",

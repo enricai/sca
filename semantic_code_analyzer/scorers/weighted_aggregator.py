@@ -252,7 +252,7 @@ class WeightedAggregator:
         weight_values = list(weights.values())
 
         # Calculate score consistency (low variance = high confidence)
-        score_variance = np.var(score_values)
+        score_variance = float(np.var(score_values, dtype=np.float64))
         consistency_factor = 1.0 / (1.0 + score_variance)
 
         # Calculate weight distribution (more balanced = higher confidence)
@@ -261,7 +261,7 @@ class WeightedAggregator:
         distribution_factor = weight_entropy / max_entropy if max_entropy > 0 else 1.0
 
         # Calculate average score level (higher scores = higher confidence)
-        avg_score = np.mean(score_values)
+        avg_score = float(np.mean(score_values, dtype=np.float64))
         score_level_factor = avg_score
 
         # Combine factors with weights
@@ -280,9 +280,9 @@ class WeightedAggregator:
 
         score_values = list(scores.values())
         return {
-            "mean": float(np.mean(score_values)),
+            "mean": float(np.mean(score_values, dtype=np.float64)),
             "median": float(np.median(score_values)),
-            "std": float(np.std(score_values)),
+            "std": float(np.std(score_values, dtype=np.float64)),
             "min": float(np.min(score_values)),
             "max": float(np.max(score_values)),
             "range": float(np.max(score_values) - np.min(score_values)),

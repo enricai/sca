@@ -913,7 +913,7 @@ class PatternIndexer:
                     "recommended_chunk_size"
                 ]
             else:
-                chunk_size = 512  # Default fallback
+                chunk_size = 2048  # Default fallback - allow larger functions
 
         logger.info(
             f"Building pattern index for domain: {domain} "

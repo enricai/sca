@@ -412,7 +412,34 @@ class DomainAwareAdherenceAnalyzer(BaseAnalyzer):
                 f"average score={overall_function_score:.4f}"
             )
         else:
-            overall_function_score = None
+            # Fallback: If all functions were skipped (too large), use whole-file similarity
+            if (
+                self.pattern_indexer is not None
+                and domain_str in self.pattern_indexer.domain_indices
+            ):
+                logger.info(
+                    f"No function scores available for {file_path}, using whole-file fallback"
+                )
+                whole_file_patterns = self.pattern_indexer.search_similar_patterns(
+                    query_code=code_content,
+                    domain=domain_str,
+                    top_k=5,
+                    min_similarity=self.similarity_threshold,
+                )
+
+                if whole_file_patterns:
+                    overall_function_score = sum(
+                        p.similarity_score for p in whole_file_patterns
+                    ) / len(whole_file_patterns)
+                    similar_patterns = whole_file_patterns
+                    logger.info(
+                        f"Whole-file fallback: {len(whole_file_patterns)} matches, "
+                        f"score={overall_function_score:.4f}"
+                    )
+                else:
+                    overall_function_score = None
+            else:
+                overall_function_score = None
 
         adherence_score = self._calculate_detailed_adherence_scores(
             code_content,

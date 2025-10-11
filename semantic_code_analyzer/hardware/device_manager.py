@@ -710,7 +710,7 @@ class DeviceManager:
         if hardware.chip_generation and hardware.chip_generation.value.startswith("m3"):
             m3_optimizations: dict[str, Any] = {
                 "memory_bandwidth_gbps": hardware.memory_bandwidth_gbps,
-                "recommended_chunk_size": min(1024, int(hardware.memory_gb * 10)),
+                "recommended_chunk_size": 2048,  # Fixed size for code analysis (was too conservative at 240)
                 "parallel_processing": True,
                 "cache_optimization": "aggressive",
             }
