@@ -325,16 +325,19 @@ class DomainAwareAdherenceAnalyzer(BaseAnalyzer):
     ) -> AdherenceAnalysisResult:
         """Perform comprehensive domain-aware adherence analysis using function-level scoring.
 
-        This method implements the function-level chunking and top-5 averaging strategy:
+        This method implements the function-level chunking and adaptive scoring strategy:
         1. Extract functions from the code using tree-sitter AST parsing
         2. For each function, find the top-5 most similar functions in the reference corpus
-        3. Average the similarities of those top-5 matches to get the function's score
+        3. Adaptive scoring:
+           - If top-1 similarity ≥ 0.85: Use top-1 (clear pattern match)
+           - If top-1 similarity < 0.85: Use top-3 average (robustness against false positives)
         4. Average all function scores to get the overall file adherence score
 
         This approach provides more granular and robust scoring compared to whole-file
         similarity, as it:
         - Matches at the function level (natural unit of code)
-        - Uses top-5 averaging to reduce sensitivity to outliers
+        - Rewards following best practices (high confidence → top-1)
+        - Robust against spurious matches (low confidence → top-3 averaging)
         - Provides consistent granularity across different file sizes
 
         Args:
@@ -387,15 +390,25 @@ class DomainAwareAdherenceAnalyzer(BaseAnalyzer):
                 )
 
                 if func_similar_patterns:
-                    # Average the top-5 similarities for this function
-                    func_score = sum(
-                        p.similarity_score for p in func_similar_patterns
-                    ) / len(func_similar_patterns)
+                    # Adaptive scoring: top-1 for high confidence, top-3 for robustness
+                    top_1_score = func_similar_patterns[0].similarity_score
+
+                    # High confidence threshold (0.85)
+                    if top_1_score >= 0.85:
+                        # Clear pattern match - use top-1
+                        func_score = top_1_score
+                        scoring_method = "top-1"
+                    else:
+                        # Lower confidence - use top-3 averaging for robustness
+                        top_3 = func_similar_patterns[:3]
+                        func_score = sum(p.similarity_score for p in top_3) / len(top_3)
+                        scoring_method = "top-3"
+
                     function_scores.append(func_score)
 
                     logger.debug(
                         f"Function {func_chunk.function_name}: {len(func_similar_patterns)} matches, "
-                        f"score={func_score:.4f}"
+                        f"score={func_score:.4f} (method: {scoring_method})"
                     )
 
                     # Keep similar patterns for the first function (for reporting)
@@ -428,13 +441,23 @@ class DomainAwareAdherenceAnalyzer(BaseAnalyzer):
                 )
 
                 if whole_file_patterns:
-                    overall_function_score = sum(
-                        p.similarity_score for p in whole_file_patterns
-                    ) / len(whole_file_patterns)
+                    # Apply same adaptive logic for consistency
+                    top_1_score = whole_file_patterns[0].similarity_score
+
+                    if top_1_score >= 0.85:
+                        overall_function_score = top_1_score
+                        scoring_method = "top-1"
+                    else:
+                        top_3 = whole_file_patterns[:3]
+                        overall_function_score = sum(
+                            p.similarity_score for p in top_3
+                        ) / len(top_3)
+                        scoring_method = "top-3"
+
                     similar_patterns = whole_file_patterns
                     logger.info(
-                        f"Whole-file fallback: {len(whole_file_patterns)} matches, "
-                        f"score={overall_function_score:.4f}"
+                        f"Whole-file fallback: score={overall_function_score:.4f} "
+                        f"(method: {scoring_method})"
                     )
                 else:
                     overall_function_score = None
