@@ -226,9 +226,9 @@ def cli(ctx: click.Context, verbose: bool) -> None:
 )
 @click.option(
     "--device",
-    type=click.Choice(["auto", "cpu", "mps", "cuda"]),
+    type=click.Choice(["auto", "cpu", "mps", "cuda", "rocm", "xpu"]),
     default="auto",
-    help="Hardware device preference for AI model acceleration (auto, cpu, mps, cuda)",
+    help="Hardware device preference for AI model acceleration (auto, cpu, mps, cuda, rocm, xpu)",
 )
 @click.option(
     "--pattern-index-commit",
@@ -422,11 +422,17 @@ def analyze(
         logger.info(f"Supports CUDA: {hardware_info.supports_cuda}")
 
         # Enhanced user-facing device status display
-        device_icon = (
-            "⚡"
-            if hardware_info.device_type == DeviceType.MPS
-            else "🖥️" if hardware_info.device_type == DeviceType.CUDA else "💻"
-        )
+        # Map device types to icons
+        if hardware_info.device_type == DeviceType.MPS:
+            device_icon = "⚡"
+        elif hardware_info.device_type == DeviceType.CUDA:
+            device_icon = "🖥️"
+        elif hardware_info.device_type == DeviceType.ROCM:
+            device_icon = "🎮"
+        elif hardware_info.device_type == DeviceType.XPU:
+            device_icon = "🔷"
+        else:
+            device_icon = "💻"
         console.print(
             f"[dim]{device_icon} Using: {hardware_info.device_name} "
             f"({hardware_info.memory_gb:.1f}GB memory)[/dim]"
@@ -535,9 +541,9 @@ def analyze(
 @click.option("--output", "-o", help="Output file for comparison results")
 @click.option(
     "--device",
-    type=click.Choice(["auto", "cpu", "mps", "cuda"]),
+    type=click.Choice(["auto", "cpu", "mps", "cuda", "rocm", "xpu"]),
     default="auto",
-    help="Hardware device preference for AI model acceleration (auto, cpu, mps, cuda)",
+    help="Hardware device preference for AI model acceleration (auto, cpu, mps, cuda, rocm, xpu)",
 )
 @click.pass_context
 def compare(
@@ -586,11 +592,17 @@ def compare(
     hardware_info = device_manager.hardware_info
     device_status = device_manager.get_device_status_report()
 
-    device_icon = (
-        "⚡"
-        if hardware_info.device_type == DeviceType.MPS
-        else "🖥️" if hardware_info.device_type == DeviceType.CUDA else "💻"
-    )
+    # Map device types to icons
+    if hardware_info.device_type == DeviceType.MPS:
+        device_icon = "⚡"
+    elif hardware_info.device_type == DeviceType.CUDA:
+        device_icon = "🖥️"
+    elif hardware_info.device_type == DeviceType.ROCM:
+        device_icon = "🎮"
+    elif hardware_info.device_type == DeviceType.XPU:
+        device_icon = "🔷"
+    else:
+        device_icon = "💻"
     console.print(
         f"[dim]{device_icon} Using: {hardware_info.device_name} "
         f"({hardware_info.memory_gb:.1f}GB memory)[/dim]"
@@ -1030,9 +1042,9 @@ def _get_severity_color(severity: str) -> str:
 )
 @click.option(
     "--device",
-    type=click.Choice(["auto", "cpu", "mps", "cuda"]),
+    type=click.Choice(["auto", "cpu", "mps", "cuda", "rocm", "xpu"]),
     default="auto",
-    help="Hardware device preference (auto, cpu, mps, cuda)",
+    help="Hardware device preference (auto, cpu, mps, cuda, rocm, xpu)",
 )
 @click.option(
     "--output-name",
@@ -1107,11 +1119,17 @@ def fine_tune(
 
         # Display hardware info
         hardware_info = device_manager.hardware_info
-        device_icon = (
-            "⚡"
-            if hardware_info.device_type == DeviceType.MPS
-            else "🖥️" if hardware_info.device_type == DeviceType.CUDA else "💻"
-        )
+        # Map device types to icons
+        if hardware_info.device_type == DeviceType.MPS:
+            device_icon = "⚡"
+        elif hardware_info.device_type == DeviceType.CUDA:
+            device_icon = "🖥️"
+        elif hardware_info.device_type == DeviceType.ROCM:
+            device_icon = "🎮"
+        elif hardware_info.device_type == DeviceType.XPU:
+            device_icon = "🔷"
+        else:
+            device_icon = "💻"
         console.print(
             f"[dim]{device_icon} Using: {hardware_info.device_name} "
             f"({hardware_info.memory_gb:.1f}GB memory)[/dim]"

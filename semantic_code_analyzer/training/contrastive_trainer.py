@@ -41,7 +41,7 @@ import torch
 import torch.nn.functional as F
 from torch.optim import AdamW
 from torch.utils.data import DataLoader, Dataset
-from tqdm import tqdm  # type: ignore[import-untyped]
+from tqdm import tqdm
 from transformers import AutoModel, AutoTokenizer, get_linear_schedule_with_warmup
 
 from ..hardware import DeviceManager, DeviceType

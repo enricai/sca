@@ -560,6 +560,10 @@ class PatternIndexer:
             self._apply_mps_optimizations()
         elif hardware_info.device_type == DeviceType.CUDA:
             self._apply_cuda_optimizations()
+        elif hardware_info.device_type == DeviceType.ROCM:
+            self._apply_rocm_optimizations()
+        elif hardware_info.device_type == DeviceType.XPU:
+            self._apply_xpu_optimizations()
 
         # Memory optimizations for unified memory architectures
         if hardware_info.unified_memory:
@@ -600,6 +604,35 @@ class PatternIndexer:
 
         except Exception as e:
             logger.warning(f"Could not apply all CUDA optimizations: {e}")
+
+    def _apply_rocm_optimizations(self) -> None:
+        """Apply ROCm-specific optimizations (AMD GPUs)."""
+        try:
+            # ROCm uses CUDA API compatibility (HIP), so apply similar optimizations
+            torch.backends.cuda.matmul.allow_tf32 = True
+            torch.backends.cudnn.allow_tf32 = True
+
+            # Enable memory pooling
+            if self.device_manager.device_config.enable_memory_pooling:
+                torch.cuda.empty_cache()
+
+            logger.debug("Applied ROCm-specific optimizations")
+
+        except Exception as e:
+            logger.warning(f"Could not apply all ROCm optimizations: {e}")
+
+    def _apply_xpu_optimizations(self) -> None:
+        """Apply Intel XPU-specific optimizations."""
+        try:
+            # Enable memory pooling if available
+            if self.device_manager.device_config.enable_memory_pooling:
+                if hasattr(torch, "xpu") and hasattr(torch.xpu, "empty_cache"):
+                    torch.xpu.empty_cache()
+
+            logger.debug("Applied Intel XPU-specific optimizations")
+
+        except Exception as e:
+            logger.warning(f"Could not apply all XPU optimizations: {e}")
 
     def _apply_unified_memory_optimizations(self) -> None:
         """Apply optimizations for unified memory architectures (Apple Silicon)."""
@@ -789,8 +822,10 @@ class PatternIndexer:
         # Synchronize device before timing
         if self.device.type == "mps":
             torch.mps.synchronize()
-        elif self.device.type == "cuda":
+        elif self.device.type == "cuda":  # Includes ROCm (uses CUDA API)
             torch.cuda.synchronize()
+        elif self.device.type == "xpu" and hasattr(torch, "xpu"):
+            torch.xpu.synchronize()
 
         # Run benchmark
         start_time = time.time()
@@ -800,8 +835,10 @@ class PatternIndexer:
         # Synchronize device after timing
         if self.device.type == "mps":
             torch.mps.synchronize()
-        elif self.device.type == "cuda":
+        elif self.device.type == "cuda":  # Includes ROCm (uses CUDA API)
             torch.cuda.synchronize()
+        elif self.device.type == "xpu" and hasattr(torch, "xpu"):
+            torch.xpu.synchronize()
 
         elapsed_time = time.time() - start_time
         avg_time_per_embedding = elapsed_time / iterations
@@ -1536,7 +1573,9 @@ class PatternIndexer:
             # Download if not already cached
             if not local_model_dir.exists():
                 logger.info(f"Downloading model from HuggingFace Hub: {hub_model_id}")
-                downloaded_path = snapshot_download(
+                # User-specified fine-tuned models cannot have pinned revisions
+                # as they are custom models uploaded by users, not base models
+                downloaded_path = snapshot_download(  # nosec B615
                     repo_id=hub_model_id,
                     cache_dir=str(hub_cache_dir),
                     local_dir=str(local_model_dir),

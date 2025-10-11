@@ -43,9 +43,11 @@ code in this repository.
 - Fine-tune model:
   `sca-analyze fine-tune HEAD --repo-path . --epochs 3 --batch-size 8`
 - Fine-tune and push to HuggingFace Hub (public):
-  `sca-analyze fine-tune HEAD --repo-path . --epochs 3 --batch-size 8 --push-to-hub --hub-model-id username/model-name`
+  `sca-analyze fine-tune HEAD --repo-path . --epochs 3 --batch-size 8 \
+  --push-to-hub --hub-model-id username/model-name`
 - Fine-tune and push to HuggingFace Hub (private):
-  `sca-analyze fine-tune HEAD --repo-path . --epochs 3 --batch-size 8 --push-to-hub --hub-model-id username/model-name --private`
+  `sca-analyze fine-tune HEAD --repo-path . --epochs 3 --batch-size 8 \
+  --push-to-hub --hub-model-id username/model-name --private`
 - Use fine-tuned model (local): `sca-analyze analyze HEAD --fine-tuned-model abc123d`
 - Use fine-tuned model (from Hub):
   `sca-analyze analyze HEAD --fine-tuned-model username/model-name`

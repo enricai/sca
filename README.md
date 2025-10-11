@@ -494,6 +494,7 @@ sca-analyze analyze HEAD --fine-tuned-model username/my-code-style
 ```
 
 **Benefits:**
+
 - Train on powerful cloud GPUs (A100: ~30-60 min vs M3: ~48 hours)
 - Share models across team members
 - Access models from any machine

@@ -56,6 +56,8 @@ class TestDeviceManager(unittest.TestCase):
             chip_generation=ChipGeneration.M3,
             supports_mps=True,
             supports_cuda=False,
+            supports_rocm=False,
+            supports_xpu=False,
             neural_engine_cores=16,
             gpu_cores=10,
             memory_bandwidth_gbps=100.0,
@@ -339,6 +341,8 @@ class TestDeviceTypes(unittest.TestCase):
         self.assertEqual(DeviceType.CPU.value, "cpu")
         self.assertEqual(DeviceType.CUDA.value, "cuda")
         self.assertEqual(DeviceType.MPS.value, "mps")
+        self.assertEqual(DeviceType.ROCM.value, "rocm")
+        self.assertEqual(DeviceType.XPU.value, "xpu")
 
     def test_chip_generation_enum(self) -> None:
         """Test ChipGeneration enum values."""
@@ -360,6 +364,8 @@ class TestDeviceTypes(unittest.TestCase):
             chip_generation=ChipGeneration.M3,
             supports_mps=True,
             supports_cuda=False,
+            supports_rocm=False,
+            supports_xpu=False,
             neural_engine_cores=16,
             gpu_cores=10,
             memory_bandwidth_gbps=100.0,

@@ -49,6 +49,8 @@ class DeviceType(Enum):
     CPU = "cpu"
     CUDA = "cuda"
     MPS = "mps"  # Metal Performance Shaders (Apple Silicon)
+    ROCM = "rocm"  # AMD ROCm (AMD GPUs)
+    XPU = "xpu"  # Intel XPU (Intel GPUs via oneAPI)
 
 
 class ChipGeneration(Enum):
@@ -83,6 +85,8 @@ class HardwareInfo:
     chip_generation: ChipGeneration | None
     supports_mps: bool
     supports_cuda: bool
+    supports_rocm: bool
+    supports_xpu: bool
     neural_engine_cores: int | None
     gpu_cores: int | None
     memory_bandwidth_gbps: float | None
@@ -168,8 +172,19 @@ class DeviceManager:
 
     @property
     def torch_device(self) -> torch.device:
-        """Get PyTorch device object."""
-        return torch.device(self.device_config.device_type.value)
+        """Get PyTorch device object.
+
+        Returns:
+            PyTorch device object with proper device string mapping
+        """
+        device_type = self.device_config.device_type
+
+        # ROCm uses CUDA API compatibility layer (HIP)
+        # PyTorch expects "cuda" device string for ROCm
+        if device_type == DeviceType.ROCM:
+            return torch.device("cuda")
+
+        return torch.device(device_type.value)
 
     def _detect_hardware(self) -> None:
         """Perform comprehensive hardware detection with M3-specific logic."""
@@ -225,6 +240,22 @@ class DeviceManager:
             logger.error(f"Error checking CUDA availability: {e}")
             supports_cuda = False
 
+        logger.info("Checking ROCm availability...")
+        try:
+            supports_rocm = self._check_rocm_availability()
+            logger.info(f"ROCm support detected: {supports_rocm}")
+        except Exception as e:
+            logger.error(f"Error checking ROCm availability: {e}")
+            supports_rocm = False
+
+        logger.info("Checking Intel XPU availability...")
+        try:
+            supports_xpu = self._check_xpu_availability()
+            logger.info(f"Intel XPU support detected: {supports_xpu}")
+        except Exception as e:
+            logger.error(f"Error checking Intel XPU availability: {e}")
+            supports_xpu = False
+
         # Apple Silicon specific details
         logger.info("Getting Apple Silicon specifications...")
         neural_engine_cores = None
@@ -253,7 +284,10 @@ class DeviceManager:
         logger.info(f"Prefer device: {self.prefer_device}")
         logger.info(f"MPS available: {supports_mps}")
         logger.info(f"CUDA available: {supports_cuda}")
+        logger.info(f"ROCm available: {supports_rocm}")
+        logger.info(f"XPU available: {supports_xpu}")
 
+        # Priority order (if no preference): MPS > CUDA > ROCm > XPU > CPU
         if supports_mps and (
             self.prefer_device is None or self.prefer_device == DeviceType.MPS
         ):
@@ -266,6 +300,18 @@ class DeviceManager:
             device_type = DeviceType.CUDA
             device_name = f"CUDA ({torch.cuda.get_device_name(0) if torch.cuda.is_available() else 'unknown'})"
             logger.info(f"Selected device: CUDA - {device_name}")
+        elif supports_rocm and (
+            self.prefer_device is None or self.prefer_device == DeviceType.ROCM
+        ):
+            device_type = DeviceType.ROCM
+            device_name = f"AMD ROCm ({self._get_rocm_device_name()})"
+            logger.info(f"Selected device: ROCm - {device_name}")
+        elif supports_xpu and (
+            self.prefer_device is None or self.prefer_device == DeviceType.XPU
+        ):
+            device_type = DeviceType.XPU
+            device_name = f"Intel XPU ({self._get_xpu_device_name()})"
+            logger.info(f"Selected device: XPU - {device_name}")
         else:
             device_type = DeviceType.CPU
             device_name = f"CPU ({platform.processor() or 'unknown'})"
@@ -283,6 +329,8 @@ class DeviceManager:
             chip_generation=chip_generation,
             supports_mps=supports_mps,
             supports_cuda=supports_cuda,
+            supports_rocm=supports_rocm,
+            supports_xpu=supports_xpu,
             neural_engine_cores=neural_engine_cores,
             gpu_cores=gpu_cores,
             memory_bandwidth_gbps=memory_bandwidth_gbps,
@@ -324,6 +372,68 @@ class DeviceManager:
 
         # Fallback: check architecture
         return platform.machine() in ["arm64", "aarch64"]
+
+    def _check_rocm_availability(self) -> bool:
+        """Check if AMD ROCm is available for PyTorch.
+
+        Returns:
+            True if ROCm is available, False otherwise
+        """
+        try:
+            # Check if PyTorch was built with ROCm support
+            # ROCm uses CUDA API compatibility, so we check for 'hip' in version
+            if hasattr(torch.version, "hip") and torch.version.hip is not None:
+                # Check if ROCm device is actually available
+                if torch.cuda.is_available():
+                    return True
+            return False
+        except Exception as e:
+            logger.debug(f"ROCm availability check failed: {e}")
+            return False
+
+    def _check_xpu_availability(self) -> bool:
+        """Check if Intel XPU (oneAPI) is available for PyTorch.
+
+        Returns:
+            True if Intel XPU is available, False otherwise
+        """
+        try:
+            # Check if PyTorch has XPU support (intel_extension_for_pytorch)
+            if hasattr(torch, "xpu") and torch.xpu.is_available():
+                return True
+            return False
+        except Exception as e:
+            logger.debug(f"Intel XPU availability check failed: {e}")
+            return False
+
+    def _get_rocm_device_name(self) -> str:
+        """Get AMD GPU device name via ROCm.
+
+        Returns:
+            Device name string
+        """
+        try:
+            if torch.cuda.is_available():
+                return torch.cuda.get_device_name(0)
+            return "unknown AMD GPU"
+        except Exception:
+            return "unknown AMD GPU"
+
+    def _get_xpu_device_name(self) -> str:
+        """Get Intel XPU device name.
+
+        Returns:
+            Device name string
+        """
+        try:
+            if hasattr(torch, "xpu") and torch.xpu.is_available():
+                # Try to get device name
+                if hasattr(torch.xpu, "get_device_name"):
+                    return torch.xpu.get_device_name(0)
+                return "Intel XPU"
+            return "unknown Intel XPU"
+        except Exception:
+            return "unknown Intel XPU"
 
     def _detect_apple_chip_generation(self) -> ChipGeneration | None:
         """Detect specific Apple Silicon chip generation."""
@@ -526,6 +636,20 @@ class DeviceManager:
             enable_mixed_precision = True
             enable_memory_pooling = True
 
+        # ROCm optimizations (AMD GPUs)
+        elif hardware.device_type == DeviceType.ROCM:
+            batch_size = 64  # ROCm has similar performance to CUDA
+            max_memory_fraction = 0.8
+            enable_mixed_precision = True
+            enable_memory_pooling = True
+
+        # Intel XPU optimizations
+        elif hardware.device_type == DeviceType.XPU:
+            batch_size = 32  # Conservative batch size for Intel XPU
+            max_memory_fraction = 0.7
+            enable_mixed_precision = True
+            enable_memory_pooling = True
+
         # CPU fallback
         else:
             batch_size = max(1, min(8, hardware.cpu_count))
@@ -613,6 +737,8 @@ class DeviceManager:
             torch.mps.synchronize()
         elif device.type == "cuda":
             torch.cuda.synchronize()
+        elif device.type == "xpu" and hasattr(torch, "xpu"):
+            torch.xpu.synchronize()
 
         # Benchmark
         start_time = time.time()
@@ -624,8 +750,10 @@ class DeviceManager:
 
             if device.type == "mps":
                 torch.mps.synchronize()
-            elif device.type == "cuda":
+            elif device.type == "cuda":  # Includes ROCm (uses CUDA API)
                 torch.cuda.synchronize()
+            elif device.type == "xpu" and hasattr(torch, "xpu"):
+                torch.xpu.synchronize()
 
         elapsed_time = time.time() - start_time
         ops_per_second = operations / elapsed_time
@@ -668,6 +796,22 @@ class DeviceManager:
                     / (1024**3),
                 }
             )
+        elif (
+            self.hardware_info.device_type == DeviceType.ROCM
+            and torch.cuda.is_available()
+        ):
+            # ROCm uses CUDA API compatibility (HIP)
+            memory_info.update(
+                {
+                    "rocm_memory_allocated_gb": torch.cuda.memory_allocated()
+                    / (1024**3),
+                    "rocm_memory_reserved_gb": torch.cuda.memory_reserved() / (1024**3),
+                    "rocm_memory_total_gb": torch.cuda.get_device_properties(
+                        0
+                    ).total_memory
+                    / (1024**3),
+                }
+            )
         elif self.hardware_info.device_type == DeviceType.MPS:
             # MPS shares system memory
             memory_info.update(
@@ -677,6 +821,22 @@ class DeviceManager:
                     * self.device_config.max_memory_fraction,
                 }
             )
+        elif self.hardware_info.device_type == DeviceType.XPU and hasattr(torch, "xpu"):
+            # Intel XPU memory tracking
+            try:
+                if hasattr(torch.xpu, "memory_allocated"):
+                    memory_info.update(
+                        {
+                            "xpu_memory_allocated_gb": torch.xpu.memory_allocated()
+                            / (1024**3),
+                        }
+                    )
+                if hasattr(torch.xpu, "memory_reserved"):
+                    memory_info["xpu_memory_reserved_gb"] = (
+                        torch.xpu.memory_reserved() / (1024**3)
+                    )
+            except Exception as e:
+                logger.debug(f"Could not get XPU memory info: {e}")
 
         return memory_info
 
@@ -934,6 +1094,8 @@ class DeviceManager:
             ),
             "mps_available": hardware.supports_mps,
             "cuda_available": hardware.supports_cuda,
+            "rocm_available": hardware.supports_rocm,
+            "xpu_available": hardware.supports_xpu,
             "warnings": [],
             "performance_notes": [],
             "troubleshooting": [],
