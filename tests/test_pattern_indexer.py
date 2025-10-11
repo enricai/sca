@@ -447,3 +447,33 @@ export default TestComponent;
         assert len(pattern_index.code_snippets) == 2
         assert pattern_index.embeddings.shape == (5, 1536)
         assert pattern_index.metadata["test"] is True
+
+    def test_data_compression_integration(self, mock_model_components: Any) -> None:
+        """Test data compression integration with PatternIndexer."""
+        from semantic_code_analyzer.parsing.data_compressor import (
+            DataCompressionConfig,
+        )
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            # Create indexer with compression enabled
+            config = DataCompressionConfig(enabled=True)
+            indexer = PatternIndexer(cache_dir=temp_dir, compression_config=config)
+
+            # Verify compression config is passed through
+            assert indexer.compression_config.enabled is True
+            assert indexer.function_extractor.compression_config.enabled is True
+
+    def test_data_compression_disabled(self, mock_model_components: Any) -> None:
+        """Test that data compression can be disabled."""
+        from semantic_code_analyzer.parsing.data_compressor import (
+            DataCompressionConfig,
+        )
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            # Create indexer with compression disabled
+            config = DataCompressionConfig(enabled=False)
+            indexer = PatternIndexer(cache_dir=temp_dir, compression_config=config)
+
+            # Verify compression is disabled
+            assert indexer.compression_config.enabled is False
+            assert indexer.function_extractor.compression_config.enabled is False

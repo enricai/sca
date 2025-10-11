@@ -24,10 +24,13 @@
 
 from __future__ import annotations
 
+from .data_compressor import DataCompressionConfig, DataCompressor
 from .function_extractor import FunctionChunk, FunctionExtractor
 from .language_registry import LanguageRegistry
 
 __all__ = [
+    "DataCompressor",
+    "DataCompressionConfig",
     "FunctionExtractor",
     "FunctionChunk",
     "LanguageRegistry",

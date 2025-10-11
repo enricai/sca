@@ -49,6 +49,7 @@ from transformers import AutoModel, AutoTokenizer
 from ..hardware.device_manager import DeviceManager, DeviceType
 from ..hardware.exceptions import FallbackError, ModelLoadingError
 from ..parsing import FunctionExtractor
+from ..parsing.data_compressor import DataCompressionConfig
 
 logger = logging.getLogger(__name__)
 
@@ -107,6 +108,7 @@ class PatternIndexer:
         enable_optimizations: bool = True,
         progress_callback: Callable[[str], None] | None = None,
         fine_tuned_model_commit: str | None = None,
+        compression_config: DataCompressionConfig | None = None,
     ):
         """Initialize the PatternIndexer with Qodo-Embed model.
 
@@ -118,6 +120,7 @@ class PatternIndexer:
             enable_optimizations: Enable hardware-specific optimizations
             progress_callback: Optional callback to report initialization progress
             fine_tuned_model_commit: Commit hash of fine-tuned model to load (optional)
+            compression_config: Configuration for data compression (uses defaults if None)
         """
         logger.info("=== PATTERN INDEXER INIT START ===")
         logger.info("Starting PatternIndexer initialization")
@@ -428,10 +431,15 @@ class PatternIndexer:
             {}
         )
 
-        # Initialize function extractor for AST-based chunking
+        # Store compression configuration
+        self.compression_config = compression_config or DataCompressionConfig()
+
+        # Initialize function extractor for AST-based chunking with compression support
         report_progress("Initializing function extractor...")
-        self.function_extractor = FunctionExtractor()
-        logger.info("FunctionExtractor initialized")
+        self.function_extractor = FunctionExtractor(
+            compression_config=self.compression_config
+        )
+        logger.info("FunctionExtractor initialized with data compression support")
 
         # Performance metrics tracking
         self._performance_metrics = {
@@ -945,7 +953,23 @@ class PatternIndexer:
                     file_path, content
                 )
 
+                # Get language name for this file
+                file_ext = Path(file_path).suffix.lower()
+                lang_config = (
+                    self.function_extractor.language_registry.get_language_for_extension(
+                        file_ext
+                    )
+                    if self.function_extractor.language_registry
+                    else None
+                )
+                language_name = lang_config.name if lang_config else None
+
                 for func_chunk in function_chunks:
+                    # Apply data compression if function is data-heavy
+                    func_chunk = self.function_extractor.apply_data_compression(
+                        func_chunk, language=language_name
+                    )
+
                     # Check token length
                     chunk_code = func_chunk.code
                     tokens = self.tokenizer.encode(chunk_code, truncation=False)

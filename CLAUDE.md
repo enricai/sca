@@ -355,6 +355,87 @@ except Exception as e:
 - Use numpy for numerical computations when dealing with large datasets
 - Consider using async/await for I/O-bound operations
 
+## Universal Data Compression
+
+The analyzer includes a universal data compression system for handling functions
+with large embedded data (e.g., SVG paths, SQL queries, JSON, HTML templates).
+This feature allows the analyzer to focus on code logic patterns rather than
+embedded data, improving token efficiency and analysis quality.
+
+### How It Works
+
+- **Detection**: Automatically detects functions where data (strings, arrays,
+  objects) comprises >70% of the content
+- **Compression**: Replaces large data nodes with placeholders while preserving
+  code structure
+- **Language-Agnostic**: Uses tree-sitter AST analysis to work across all
+  supported languages
+- **Configurable**: Fully tunable via `DataCompressionConfig`
+
+### Configuration
+
+```python
+from semantic_code_analyzer.parsing.data_compressor import DataCompressionConfig
+
+config = DataCompressionConfig(
+    enabled=True,              # Enable/disable compression
+    threshold_ratio=0.7,       # Min data-to-code ratio (70%)
+    min_data_size=1000,        # Min bytes to trigger compression
+    max_string_size=100,       # Compress strings > 100 chars
+    max_array_items=5          # Keep first 5 array items
+)
+```
+
+### Integration
+
+Data compression is integrated into the `PatternIndexer` and automatically
+applied during index building:
+
+```python
+from semantic_code_analyzer.embeddings.pattern_indexer import PatternIndexer
+
+# With compression enabled (default)
+indexer = PatternIndexer(compression_config=config)
+
+# With compression disabled
+disabled_config = DataCompressionConfig(enabled=False)
+indexer = PatternIndexer(compression_config=disabled_config)
+```
+
+### Example Transformations
+
+**Before (3000 tokens):**
+
+```typescript
+export function AnswerIcon(props: SVGProps<SVGSVGElement>) {
+    return (
+        <svg>
+            <path d="M12 2C6.48 2 2 6.48 2 12s4.48... (3000 chars)"/>
+        </svg>
+    );
+}
+```
+
+**After (150 tokens):**
+
+```typescript
+export function AnswerIcon(props: SVGProps<SVGSVGElement>) {
+    return (
+        <svg>
+            <path d="..."/>
+        </svg>
+    );
+}
+```
+
+### Language Support
+
+Compression works universally across all tree-sitter-supported languages:
+
+- Python, JavaScript, TypeScript, Java, Go, Rust, C, C++, Ruby, PHP
+- Language-specific optimizations available for common patterns
+- Universal fallback for languages without specific mappings
+
 ## Security Best Practices
 
 - Validate all external inputs (file paths, user data, command arguments)

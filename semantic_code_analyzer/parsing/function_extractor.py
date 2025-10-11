@@ -33,6 +33,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from .data_compressor import DataCompressionConfig, DataCompressor
 from .language_registry import LanguageRegistry
 
 logger = logging.getLogger(__name__)
@@ -86,14 +87,19 @@ class FunctionExtractor:
     any language with a tree-sitter grammar.
     """
 
-    def __init__(self) -> None:
-        """Initialize the FunctionExtractor with language registry."""
+    def __init__(self, compression_config: DataCompressionConfig | None = None) -> None:
+        """Initialize the FunctionExtractor with language registry.
+
+        Args:
+            compression_config: Configuration for data compression (uses defaults if None)
+        """
         if not TREE_SITTER_AVAILABLE:
             logger.warning(
                 "FunctionExtractor initialized without tree-sitter support. "
                 "Function extraction will fall back to simple chunking."
             )
             self.language_registry: LanguageRegistry | None = None
+            self.compression_config = compression_config or DataCompressionConfig()
             return
 
         # Initialize language registry for automatic parser discovery
@@ -110,6 +116,9 @@ class FunctionExtractor:
         except Exception as e:
             logger.error(f"Failed to initialize LanguageRegistry: {e}")
             self.language_registry = None
+
+        # Store compression configuration
+        self.compression_config = compression_config or DataCompressionConfig()
 
     def extract_functions(self, file_path: str, content: str) -> list[FunctionChunk]:
         """Extract functions from source code file using universal query-based parsing.
@@ -197,8 +206,13 @@ class FunctionExtractor:
             import_lines = []
             import_nodes = captures_dict.get("import", [])
 
+            # Convert content to bytes for correct byte offset slicing
+            content_bytes = bytes(content, "utf8")
+
             for node in import_nodes:
-                import_text = content[node.start_byte : node.end_byte]
+                # Use byte offsets on bytes, then decode
+                import_text_bytes = content_bytes[node.start_byte : node.end_byte]
+                import_text = import_text_bytes.decode("utf-8")
                 import_lines.append(import_text)
 
             return "\n".join(import_lines)
@@ -233,11 +247,16 @@ class FunctionExtractor:
             # Track which functions we've already seen to avoid duplicates
             seen_functions: set[tuple[str, int]] = set()
 
+            # Convert content to bytes for correct byte offset slicing
+            content_bytes = bytes(content, "utf8")
+
             # Process function.def captures
             function_nodes = captures_dict.get("function.def", [])
             for node in function_nodes:
-                func_name = self._extract_name_from_node(node, content)
-                func_code = content[node.start_byte : node.end_byte]
+                func_name = self._extract_name_from_node(node, content, content_bytes)
+                # Use byte offsets on bytes, then decode
+                func_code_bytes = content_bytes[node.start_byte : node.end_byte]
+                func_code = func_code_bytes.decode("utf-8")
                 start_line = node.start_point[0] + 1
                 end_line = node.end_point[0] + 1
 
@@ -258,8 +277,10 @@ class FunctionExtractor:
             # Process method.def captures
             method_nodes = captures_dict.get("method.def", [])
             for node in method_nodes:
-                func_name = self._extract_name_from_node(node, content)
-                func_code = content[node.start_byte : node.end_byte]
+                func_name = self._extract_name_from_node(node, content, content_bytes)
+                # Use byte offsets on bytes, then decode
+                func_code_bytes = content_bytes[node.start_byte : node.end_byte]
+                func_code = func_code_bytes.decode("utf-8")
                 start_line = node.start_point[0] + 1
                 end_line = node.end_point[0] + 1
 
@@ -286,20 +307,29 @@ class FunctionExtractor:
             logger.warning(f"Failed to extract functions with query: {e}")
             return []
 
-    def _extract_name_from_node(self, node: Any, content: str) -> str:
+    def _extract_name_from_node(
+        self, node: Any, content: str, content_bytes: bytes | None = None
+    ) -> str:
         """Extract name from a function/method node.
 
         Args:
             node: Tree-sitter node
-            content: File content
+            content: File content (string, kept for backwards compatibility)
+            content_bytes: File content as bytes (for correct UTF-8 byte offset slicing)
 
         Returns:
             Function/method name or line-based fallback
         """
+        # Convert content to bytes if not provided
+        if content_bytes is None:
+            content_bytes = bytes(content, "utf8")
+
         # Try to find identifier child nodes
         for child in node.children:
             if child.type in ["identifier", "property_identifier", "field_identifier"]:
-                return content[child.start_byte : child.end_byte]
+                # Use byte offsets on bytes, then decode
+                name_bytes = content_bytes[child.start_byte : child.end_byte]
+                return name_bytes.decode("utf-8")
 
         # For arrow functions or variable declarators, check parent
         if node.parent:
@@ -307,10 +337,82 @@ class FunctionExtractor:
             if parent.type == "variable_declarator":
                 for sibling in parent.children:
                     if sibling.type == "identifier":
-                        return content[sibling.start_byte : sibling.end_byte]
+                        # Use byte offsets on bytes, then decode
+                        name_bytes = content_bytes[
+                            sibling.start_byte : sibling.end_byte
+                        ]
+                        return name_bytes.decode("utf-8")
 
         # Fallback: use line number as identifier
         return f"func_line_{node.start_point[0] + 1}"
+
+    def apply_data_compression(
+        self, function_chunk: FunctionChunk, language: str | None = None
+    ) -> FunctionChunk:
+        """Apply data compression to a function chunk if it's data-heavy.
+
+        Args:
+            function_chunk: Function chunk to potentially compress
+            language: Language name for language-specific optimization
+
+        Returns:
+            Function chunk with compressed data (or original if not data-heavy)
+        """
+        if not TREE_SITTER_AVAILABLE or not self.compression_config.enabled:
+            return function_chunk
+
+        if not self.language_registry:
+            return function_chunk
+
+        try:
+            # Get language config
+            file_ext = Path(function_chunk.file_path).suffix.lower()
+            lang_config = self.language_registry.get_language_for_extension(file_ext)
+
+            if not lang_config:
+                return function_chunk
+
+            # Parse the function code
+            function_code = function_chunk.function_code
+            tree = lang_config.parser.parse(bytes(function_code, "utf8"))
+            root_node = tree.root_node
+
+            # Create data compressor for this language
+            compressor = DataCompressor(
+                config=self.compression_config,
+                language=language or lang_config.name,
+            )
+
+            # Check if function is data-heavy
+            if compressor.detect_data_heavy_function(root_node):
+                logger.info(
+                    f"Compressing data in function {function_chunk.function_name} "
+                    f"in {function_chunk.file_path}"
+                )
+
+                # Compress the data nodes
+                compressed_code = compressor.compress_data_nodes(
+                    root_node, bytes(function_code, "utf8")
+                )
+
+                # Return new chunk with compressed code
+                return FunctionChunk(
+                    function_code=compressed_code,
+                    function_name=function_chunk.function_name,
+                    file_path=function_chunk.file_path,
+                    is_method=function_chunk.is_method,
+                    imports=function_chunk.imports,
+                    start_line=function_chunk.start_line,
+                    end_line=function_chunk.end_line,
+                )
+
+            return function_chunk
+
+        except Exception as e:
+            logger.warning(
+                f"Failed to apply data compression to {function_chunk.function_name}: {e}"
+            )
+            return function_chunk
 
     def _fallback_extraction(self, file_path: str, content: str) -> list[FunctionChunk]:
         """Fallback extraction when tree-sitter is not available.
